@@ -12,7 +12,7 @@ FP（ファイナンシャルプランナー）がクライアントとの面談
 
 現在のフェーズ: 要件定義完了 / 実装前
 
-- [x] 要件定義 (`docs/requirements.md`)
+- [x] 要件定義 (`docs/spec/requirements.md`)
 - [ ] 実装
 - [ ] テスト・動作確認
 
@@ -26,9 +26,17 @@ FP（ファイナンシャルプランナー）がクライアントとの面談
 
 ---
 
+## セットアップ（Windows）
+
+[docs/guides/setup-windows.md](docs/guides/setup-windows.md) を参照してください。
+
+Python インストールからツールの起動まで、ターミナル未経験者向けに手順を説明しています。
+
+---
+
 ## 要件
 
-[docs/requirements.md](docs/requirements.md) を参照してください。
+[docs/spec/requirements.md](docs/spec/requirements.md) を参照してください。
 
 入力・計算・出力・Excel フォーマットの仕様、および FP との確認事項（計算モデルの前提）をまとめています。
 
