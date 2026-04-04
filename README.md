@@ -1,6 +1,8 @@
 # ライフイベント家計シミュレーター
 
 [![GitHub](https://img.shields.io/badge/GitHub-t--motoki%2Fdemo--life--event--simulator-blue)](https://github.com/t-motoki/demo-life-event-simulator)
+[![YouTube](https://img.shields.io/badge/YouTube-ゆる系エンジニアの手記-red)](https://www.youtube.com/channel/UCE1rHqZ5UvXkc0ZBLNiX6bA)
+[![X](https://img.shields.io/badge/X-@yumussf-black)](https://x.com/yumussf)
 
 FP（ファイナンシャルプランナー）がクライアントとの面談で使う業務ツール。
 
