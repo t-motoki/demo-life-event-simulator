@@ -3,7 +3,7 @@
 作成日: 2026-04-05
 最終更新: 2026-04-05
 
-`docs/spec/02_requirements.md` はこのブリーフをもとに生成されました。
+`docs/spec/01_requirements.md` はこのブリーフをもとに生成されました。
 
 ---
 
