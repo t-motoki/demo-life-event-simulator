@@ -23,6 +23,10 @@ FPがクライアントとの面談で使うライフイベント家計シミュ
 | `docs/spec/01_requirements.md` § 8 | 未確定事項（実装前にFP確認が必要な項目） |
 | `docs/rules/00_workflow.md` | 実装フロー・エージェント定義 |
 | `docs/rules/01_design-output.md` | 設計図の出力形式（Mermaid）・保存先 |
+| `docs/rules/02_excel-output.md` | Excel のシート構成・列順・表示形式 |
+| `docs/rules/03_validation.md` | バリデーション項目・エラーメッセージ形式 |
+| `docs/rules/04_testing.md` | テストフレームワーク・命名・境界値必須項目 |
+| `docs/rules/05_number-format.md` | 金額・年齢の表示精度・計算順序 |
 
 > **計算モデルを独断で決めない。** § 8 の未確定事項が残っている場合は実装前に確認を取る。
 
