@@ -1,0 +1,26 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'echo \"$CLAUDE_TOOL_INPUT_FILE_PATH\" | grep -q \"^src/\" && cd /home/tmotoki/pjt/life-event-simulator && python -m pytest tests/ -q --tb=short 2>&1 || true'"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'echo \"$CLAUDE_TOOL_INPUT_FILE_PATH\" | grep -q \"^src/domain/\" && grep -q \"TODO: FPに確認\" /home/tmotoki/pjt/life-event-simulator/docs/spec/01_requirements.md 2>/dev/null && echo \"警告: docs/spec/01_requirements.md に FP未確認事項が残っています。/fp-check で確認してから実装を進めてください。\" || true'"
+          }
+        ]
+      }
+    ]
+  }
+}
