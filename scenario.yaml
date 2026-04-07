@@ -1,0 +1,58 @@
+start_year: 2025
+
+client:
+  age: 35
+  annual_income: 5_000_000
+  income_model: flat
+  retirement_age: 60
+  post_retirement_income: 2_000_000
+  pension_start_age: 65
+  pension_annual: 1_800_000
+
+spouse:
+  age: 33
+  annual_income: 3_500_000
+  income_model: flat
+  retirement_age: 60
+  post_retirement_income: 0
+  pension_start_age: 65
+  pension_annual: 900_000
+
+end_age: 90
+savings_initial: 5_000_000
+
+monthly_expenses:
+  living: 200_000
+  insurance: 30_000
+  other: 20_000
+
+events:
+  - type: marriage
+    year: 2025
+    cost: 3_000_000
+
+  - type: birth
+    year: 2026
+    child_count: 1
+
+  - type: housing
+    year: 2027
+    price: 50_000_000
+    down_payment: 10_000_000
+    loan_years: 35
+    interest_rate: 0.015
+    use_tax_deduction: true
+
+  - type: education
+    year: 2026
+    child_birth_year: 2026
+    kindergarten: public
+    elementary: public
+    junior_high: public
+    high_school: public
+    university: private
+
+  - type: other_expense
+    year: 2030
+    amount: 1_000_000
+    name: 車購入

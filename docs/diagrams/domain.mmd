@@ -1,0 +1,114 @@
+classDiagram
+  %% ルートエンティティ
+  class Scenario {
+    client: Client
+    spouse: Client | None
+    savings_initial: int
+    end_age: int
+    monthly_expenses: MonthlyExpenses
+    events: list[LifeEvent]
+  }
+
+  class Client {
+    age: int
+    annual_income: int
+    income_model: IncomeModel
+    retirement_age: int
+    pension_start_age: int
+    pension_annual: int
+    %% 年金はFPが手入力（自動試算なし）
+  }
+
+  class IncomeModel {
+    <<enumeration>>
+    FLAT
+    RAISE_RATE
+    POST_RETIREMENT
+  }
+
+  class MonthlyExpenses {
+    living: int
+    insurance: int
+    other: int
+  }
+
+  %% ライフイベント基底
+  class LifeEvent {
+    <<abstract>>
+    year: int
+  }
+
+  class MarriageEvent {
+    cost: int
+  }
+
+  class BirthEvent {
+    child_count: int
+  }
+
+  class HousingEvent {
+    price: int
+    down_payment: int
+    loan_years: int
+    interest_rate: float
+    use_tax_deduction: bool
+    %% 控除: 年末ローン残高 × 0.7%（13年間）
+    %% 14年目以降は控除額 = 0
+  }
+
+  class EducationEvent {
+    child_birth_year: int
+    kindergarten: SchoolType
+    elementary: SchoolType
+    junior_high: SchoolType
+    high_school: SchoolType
+    university: SchoolType
+    %% 公立/私立ごとの標準単価テーブルを参照
+  }
+
+  class SchoolType {
+    <<enumeration>>
+    PUBLIC
+    PRIVATE
+  }
+
+  class CareEvent {
+    start_year: int
+    duration_years: int
+    monthly_cost: int
+  }
+
+  class OtherExpenseEvent {
+    amount: int
+    name: str
+  }
+
+  %% キャッシュフロー計算結果（1行 = 1年）
+  class CashFlowRow {
+    year: int
+    age_client: int
+    age_spouse: int | None
+    income_total: int
+    expense_total: int
+    loan_deduction: int
+    net: int
+    savings: int
+    events_label: str
+  }
+
+  %% 関係
+  Scenario "1" --> "1" Client : client
+  Scenario "1" --> "0..1" Client : spouse
+  Scenario "1" --> "1" MonthlyExpenses
+  Scenario "1" --> "*" LifeEvent : events
+
+  Client --> IncomeModel
+
+  LifeEvent <|-- MarriageEvent
+  LifeEvent <|-- BirthEvent
+  LifeEvent <|-- HousingEvent
+  LifeEvent <|-- EducationEvent
+  LifeEvent <|-- CareEvent
+  LifeEvent <|-- OtherExpenseEvent
+
+  EducationEvent --> SchoolType

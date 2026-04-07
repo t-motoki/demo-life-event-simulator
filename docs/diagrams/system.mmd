@@ -1,0 +1,42 @@
+graph TD
+  %% 入力
+  YAML["📄 scenario.yaml\n（FPがシナリオを記述）"]
+
+  %% input/ レイヤー
+  subgraph INPUT["src/input/"]
+    Loader["yaml_loader.py\nYAML読み込み・Pythonオブジェクト変換"]
+    Validator["validator.py\nバリデーション（範囲・矛盾チェック）"]
+  end
+
+  %% domain/ レイヤー（外部依存なし・純粋関数）
+  subgraph DOMAIN["src/domain/"]
+    Models["models.py\nデータモデル定義\n（Scenario / Client / LifeEvent 等）"]
+    CashFlow["cashflow.py\n年次キャッシュフロー計算\n収入 − 支出 + 住宅ローン控除"]
+    Loan["loan.py\n住宅ローン計算\n元利均等返済 / 年末残高 / 控除額\n%% 控除: 年末残高×0.7%, 13年固定"]
+    Education["education.py\n教育費計算\n公立/私立の標準単価テーブル"]
+  end
+
+  %% output/ レイヤー
+  subgraph OUTPUT["src/output/"]
+    ExcelWriter["excel_writer.py\nExcel出力\n2シート構成・列順固定"]
+  end
+
+  %% エントリーポイント
+  Main["main.py\nエントリーポイント"]
+
+  %% 出力
+  Excel["📊 cf_simulation_YYYYMMDD.xlsx\n（キャッシュフロー一覧 / 入力内容確認）"]
+
+  %% データの流れ
+  YAML --> Loader
+  Loader --> Validator
+  Validator --> Models
+  Models --> CashFlow
+  Loan --> CashFlow
+  Education --> CashFlow
+  CashFlow --> ExcelWriter
+  ExcelWriter --> Excel
+
+  %% エントリーポイントの制御フロー
+  Main --> Loader
+  Main --> ExcelWriter
