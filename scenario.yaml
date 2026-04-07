@@ -39,7 +39,7 @@ events:
     year: 2027
     price: 50_000_000
     down_payment: 10_000_000
-    loan_years: 35
+    loan_years: 20
     interest_rate: 0.015
     use_tax_deduction: true
 

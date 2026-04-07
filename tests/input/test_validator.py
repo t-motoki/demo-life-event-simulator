@@ -169,7 +169,7 @@ class TestHousingEventValidation:
             year=2025,
             price=30_000_000,
             down_payment=5_000_000,
-            loan_years=35,
+            loan_years=20,  # client 35歳 + 20年 = 55歳完済 < retirement_age=65
             interest_rate=0.015,
             use_tax_deduction=True,
         )
@@ -233,7 +233,8 @@ class TestHousingEventValidation:
             validate(scenario)
 
     def test_loan_years_50_passes(self):
-        """借入期間50年は有効"""
+        """借入期間50年は範囲として有効（上限50年の確認）"""
+        from src.domain.models import IncomeModel
         housing = HousingEvent(
             year=2025,
             price=30_000_000,
@@ -242,7 +243,66 @@ class TestHousingEventValidation:
             interest_rate=0.015,
             use_tax_deduction=True,
         )
-        scenario = _valid_scenario(events=[housing])
+        # retirement_age=90 にして完済年齢チェックを回避（50年ローンの範囲上限を検証する目的）
+        client_with_late_retirement = Client(
+            age=35,
+            annual_income=5_000_000,
+            income_model=IncomeModel.FLAT,
+            retirement_age=90,
+            post_retirement_income=0,
+            pension_start_age=65,
+            pension_annual=0,
+        )
+        scenario = _valid_scenario(client=client_with_late_retirement, events=[housing])
         validate(scenario)
+
+
+class TestLoanRetirementAge:
+    def test_loan_exceeds_retirement_age_raises(self):
+        """ローン完済年齢が退職年齢を超える場合はエラー"""
+        # client: 35歳, retirement_age=65, housing year=2025(35歳), loan_years=35
+        # 完済年齢 = 35 + (2025-2025) + 35 = 70 > 65 → エラー
+        housing = HousingEvent(
+            year=2025,
+            price=30_000_000,
+            down_payment=5_000_000,
+            loan_years=35,
+            interest_rate=0.015,
+            use_tax_deduction=True,
+        )
+        scenario = _valid_scenario(events=[housing])
+        with pytest.raises(ValueError, match="完済年齢"):
+            validate(scenario)
+
+    def test_loan_ends_at_retirement_age_raises(self):
+        """ローン完済年齢が退職年齢と同じ場合もエラー"""
+        # client: 35歳, retirement_age=65, housing year=2025(35歳), loan_years=30
+        # 完済年齢 = 35 + 0 + 30 = 65 == 65 → エラー
+        housing = HousingEvent(
+            year=2025,
+            price=30_000_000,
+            down_payment=5_000_000,
+            loan_years=30,
+            interest_rate=0.015,
+            use_tax_deduction=True,
+        )
+        scenario = _valid_scenario(events=[housing])
+        with pytest.raises(ValueError, match="完済年齢"):
+            validate(scenario)
+
+    def test_loan_ends_before_retirement_passes(self):
+        """ローン完済年齢が退職年齢より前は有効"""
+        # client: 35歳, retirement_age=65, housing year=2025(35歳), loan_years=25
+        # 完済年齢 = 35 + 0 + 25 = 60 < 65 → OK
+        housing = HousingEvent(
+            year=2025,
+            price=30_000_000,
+            down_payment=5_000_000,
+            loan_years=25,
+            interest_rate=0.015,
+            use_tax_deduction=True,
+        )
+        scenario = _valid_scenario(events=[housing])
+        validate(scenario)  # 例外なし
 
 

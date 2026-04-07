@@ -192,6 +192,38 @@ class TestPension:
         assert age65_row.income_total == age64_row.income_total + 1_500_000
 
 
+class TestNegativeSavingsWarning:
+    def test_warning_emitted_when_savings_goes_negative(self, capsys):
+        """貯蓄残高がマイナスに転落した年に警告を出力する"""
+        client = Client(
+            age=35,
+            annual_income=1_000_000,
+            income_model=IncomeModel.FLAT,
+            retirement_age=65,
+            post_retirement_income=0,
+            pension_start_age=65,
+            pension_annual=0,
+        )
+        monthly = MonthlyExpenses(living=300_000, insurance=50_000, other=50_000)
+        scenario = _base_scenario(
+            client=client,
+            monthly_expenses=monthly,
+            savings_initial=100_000,
+            end_age=40,
+        )
+        simulate(scenario)
+        captured = capsys.readouterr()
+        assert "警告" in captured.err
+        assert "マイナス" in captured.err
+
+    def test_no_warning_when_savings_always_positive(self, capsys):
+        """貯蓄残高が常にプラスのとき警告なし"""
+        scenario = _base_scenario()
+        simulate(scenario)
+        captured = capsys.readouterr()
+        assert captured.err == ""
+
+
 class TestNegativeSavings:
     def test_negative_savings_continues(self):
         """貯蓄残高がマイナスになっても計算を続ける"""

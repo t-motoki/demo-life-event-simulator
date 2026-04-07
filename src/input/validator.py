@@ -57,3 +57,12 @@ def validate(scenario: Scenario) -> None:
                 raise ValueError(
                     f"住宅ローン借入期間が不正です（値: {event.loan_years}年）。1〜50の範囲で入力してください。"
                 )
+            # ローン完済年齢チェック
+            age_at_purchase = client.age + (event.year - scenario.start_year)
+            age_at_payoff = age_at_purchase + event.loan_years
+            if age_at_payoff >= client.retirement_age:
+                raise ValueError(
+                    f"住宅ローンの完済年齢（{age_at_payoff}歳）が"
+                    f"退職年齢（{client.retirement_age}歳）以上になっています。"
+                    "ローン年数を短くするか、退職年齢を引き上げてください。"
+                )

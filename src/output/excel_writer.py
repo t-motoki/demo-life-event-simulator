@@ -8,7 +8,7 @@ from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 
-from src.domain.models import CashFlowRow, Scenario
+from src.domain.models import CashFlowRow, HousingEvent, Scenario
 
 
 # 貯蓄残高マイナス時の背景色
@@ -133,6 +133,21 @@ def _write_input_summary_sheet(ws, scenario: Scenario) -> None:
             ("", ""),
         ]
 
+    for event in scenario.events:
+        if isinstance(event, HousingEvent):
+            age_at_purchase = scenario.client.age + (event.year - scenario.start_year)
+            payoff_age = age_at_purchase + event.loan_years
+            rows += [
+                ("【住宅ローン】", ""),
+                ("物件価格", event.price),
+                ("頭金", event.down_payment),
+                ("借入年数", event.loan_years),
+                ("金利", event.interest_rate),
+                ("住宅ローン控除", "あり" if event.use_tax_deduction else "なし"),
+                ("完済年齢", payoff_age),
+                ("", ""),
+            ]
+
     rows += [
         ("【月間固定費】", ""),
         ("生活費", scenario.monthly_expenses.living),
@@ -145,7 +160,7 @@ def _write_input_summary_sheet(ws, scenario: Scenario) -> None:
     for r_idx, (label, value) in enumerate(rows, start=1):
         ws.cell(row=r_idx, column=1, value=label)
         cell = ws.cell(row=r_idx, column=2, value=value)
-        if isinstance(value, int) and label not in ("現在年齢", "定年年齢", "年金開始年齢", "シミュレーション開始年", "シミュレーション終了年齢（本人）"):
+        if isinstance(value, int) and label not in ("現在年齢", "定年年齢", "年金開始年齢", "シミュレーション開始年", "シミュレーション終了年齢（本人）", "借入年数", "完済年齢"):
             cell.number_format = '#,##0'
             cell.alignment = Alignment(horizontal="right")
 

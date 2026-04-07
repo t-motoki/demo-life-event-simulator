@@ -1,5 +1,6 @@
 """年次キャッシュフロー計算モジュール"""
 
+import sys
 from typing import Optional
 
 from src.domain.education import get_education_cost
@@ -170,7 +171,14 @@ def simulate(scenario: Scenario) -> list[CashFlowRow]:
 
         # --- 年間収支・貯蓄残高 ---
         net = income - expense + loan_deduction
+        prev_savings = savings
         savings = savings + net
+        if savings < 0 and prev_savings >= 0:
+            print(
+                f"警告: {year}年（本人{client_age}歳）に貯蓄残高がマイナスになりました"
+                f"（{savings:,}円）",
+                file=sys.stderr,
+            )
 
         row = CashFlowRow(
             year=year,
