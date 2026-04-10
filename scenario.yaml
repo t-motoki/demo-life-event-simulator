@@ -34,6 +34,8 @@ events:
   - type: birth
     year: 2026
     child_count: 1
+    spouse_maternity_rate: 0.6
+    spouse_maternity_years: 1
 
   - type: housing
     year: 2027

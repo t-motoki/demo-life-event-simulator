@@ -67,6 +67,33 @@ def _calc_pension(client: Client, year: int, start_year: int) -> int:
     return 0
 
 
+def _maternity_rate(events: list[LifeEvent], target: str, year: int) -> float:
+    """指定年に有効な育休減額率を返す。複数の BirthEvent がある場合は最小値を使う。
+
+    Args:
+        events: イベント一覧
+        target: "client" または "spouse"
+        year: 西暦年
+
+    Returns:
+        収入率（0.0〜1.0）。育休なしなら 1.0
+    """
+    rate = 1.0
+    for event in events:
+        if not isinstance(event, BirthEvent):
+            continue
+        if target == "client":
+            m_rate = event.client_maternity_rate
+            m_years = event.client_maternity_years
+        else:
+            m_rate = event.spouse_maternity_rate
+            m_years = event.spouse_maternity_years
+        # m_rate < 1.0 かつ育休期間内のとき、より小さい率を採用する
+        if m_rate < 1.0 and event.year <= year < event.year + m_years:
+            rate = min(rate, m_rate)
+    return rate
+
+
 def _build_loan_schedule(events: list[LifeEvent]) -> Optional[LoanSchedule]:
     """住宅イベントからローンスケジュールを構築する"""
     for event in events:
@@ -123,11 +150,14 @@ def simulate(scenario: Scenario) -> list[CashFlowRow]:
             spouse_age = scenario.spouse.age + (year - scenario.start_year)
 
         # --- 収入計算 ---
-        income = _calc_income(scenario.client, year, scenario.start_year)
+        # 育休中は給与収入に減額率を乗算する（年金収入には適用しない）
+        client_rate = _maternity_rate(scenario.events, "client", year)
+        income = int(_calc_income(scenario.client, year, scenario.start_year) * client_rate)
         income += _calc_pension(scenario.client, year, scenario.start_year)
 
         if scenario.spouse is not None:
-            income += _calc_income(scenario.spouse, year, scenario.start_year)
+            spouse_rate = _maternity_rate(scenario.events, "spouse", year)
+            income += int(_calc_income(scenario.spouse, year, scenario.start_year) * spouse_rate)
             income += _calc_pension(scenario.spouse, year, scenario.start_year)
 
         # --- 支出計算 ---

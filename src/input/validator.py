@@ -1,6 +1,6 @@
 """入力バリデーションモジュール"""
 
-from src.domain.models import HousingEvent, Scenario
+from src.domain.models import BirthEvent, HousingEvent, Scenario
 
 
 def validate(scenario: Scenario) -> None:
@@ -40,6 +40,28 @@ def validate(scenario: Scenario) -> None:
             raise ValueError(
                 f"配偶者の年齢が不正です（値: {spouse_age}）。0〜100の範囲で入力してください。"
             )
+
+    # 育休フィールドのチェック
+    for event in scenario.events:
+        if isinstance(event, BirthEvent):
+            for attr, label in [
+                ("client_maternity_rate", "本人育休収入率"),
+                ("spouse_maternity_rate", "配偶者育休収入率"),
+            ]:
+                rate = getattr(event, attr)
+                if not (0.0 <= rate <= 1.0):
+                    raise ValueError(
+                        f"{label}が不正です（値: {rate}）。0.0〜1.0の範囲で入力してください。"
+                    )
+            for attr, label in [
+                ("client_maternity_years", "本人育休期間"),
+                ("spouse_maternity_years", "配偶者育休期間"),
+            ]:
+                years = getattr(event, attr)
+                if years < 0:
+                    raise ValueError(
+                        f"{label}が不正です（値: {years}年）。0以上の値を入力してください。"
+                    )
 
     # 住宅ローンのチェック
     for event in scenario.events:

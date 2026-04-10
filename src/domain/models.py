@@ -46,6 +46,10 @@ class MarriageEvent(LifeEvent):
 @dataclass
 class BirthEvent(LifeEvent):
     child_count: int = 1
+    client_maternity_rate: float = 1.0   # 本人育休中の収入率（1.0=取得しない）
+    client_maternity_years: int = 0      # 本人育休期間（年数）
+    spouse_maternity_rate: float = 1.0   # 配偶者育休中の収入率（1.0=取得しない）
+    spouse_maternity_years: int = 0      # 配偶者育休期間（年数）
 
 
 @dataclass

@@ -3,6 +3,7 @@
 import pytest
 
 from src.domain.models import (
+    BirthEvent,
     Client,
     HousingEvent,
     IncomeModel,
@@ -255,6 +256,63 @@ class TestHousingEventValidation:
         )
         scenario = _valid_scenario(client=client_with_late_retirement, events=[housing])
         validate(scenario)
+
+
+class TestBirthEventMaternityValidation:
+    def test_client_maternity_rate_below_zero_raises(self):
+        """本人育休収入率が0未満はエラー"""
+        birth = BirthEvent(year=2026, child_count=1, client_maternity_rate=-0.1)
+        scenario = _valid_scenario(events=[birth])
+        with pytest.raises(ValueError, match="本人育休収入率"):
+            validate(scenario)
+
+    def test_client_maternity_rate_above_one_raises(self):
+        """本人育休収入率が1超はエラー"""
+        birth = BirthEvent(year=2026, child_count=1, client_maternity_rate=1.1)
+        scenario = _valid_scenario(events=[birth])
+        with pytest.raises(ValueError, match="本人育休収入率"):
+            validate(scenario)
+
+    def test_spouse_maternity_rate_below_zero_raises(self):
+        """配偶者育休収入率が0未満はエラー"""
+        birth = BirthEvent(year=2026, child_count=1, spouse_maternity_rate=-0.1)
+        scenario = _valid_scenario(events=[birth])
+        with pytest.raises(ValueError, match="配偶者育休収入率"):
+            validate(scenario)
+
+    def test_spouse_maternity_rate_above_one_raises(self):
+        """配偶者育休収入率が1超はエラー"""
+        birth = BirthEvent(year=2026, child_count=1, spouse_maternity_rate=1.5)
+        scenario = _valid_scenario(events=[birth])
+        with pytest.raises(ValueError, match="配偶者育休収入率"):
+            validate(scenario)
+
+    def test_client_maternity_years_negative_raises(self):
+        """本人育休期間が負数はエラー"""
+        birth = BirthEvent(year=2026, child_count=1, client_maternity_years=-1)
+        scenario = _valid_scenario(events=[birth])
+        with pytest.raises(ValueError, match="本人育休期間"):
+            validate(scenario)
+
+    def test_spouse_maternity_years_negative_raises(self):
+        """配偶者育休期間が負数はエラー"""
+        birth = BirthEvent(year=2026, child_count=1, spouse_maternity_years=-1)
+        scenario = _valid_scenario(events=[birth])
+        with pytest.raises(ValueError, match="配偶者育休期間"):
+            validate(scenario)
+
+    def test_valid_maternity_fields_pass(self):
+        """有効な育休フィールドはエラーなし"""
+        birth = BirthEvent(
+            year=2026,
+            child_count=1,
+            client_maternity_rate=0.5,
+            client_maternity_years=1,
+            spouse_maternity_rate=0.6,
+            spouse_maternity_years=2,
+        )
+        scenario = _valid_scenario(events=[birth])
+        validate(scenario)  # 例外なし
 
 
 class TestLoanRetirementAge:

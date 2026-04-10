@@ -59,6 +59,10 @@ def _parse_event(data: dict[str, Any]) -> LifeEvent:
             return BirthEvent(
                 year=year,
                 child_count=data.get("child_count", 1),
+                client_maternity_rate=data.get("client_maternity_rate", 1.0),
+                client_maternity_years=data.get("client_maternity_years", 0),
+                spouse_maternity_rate=data.get("spouse_maternity_rate", 1.0),
+                spouse_maternity_years=data.get("spouse_maternity_years", 0),
             )
         case "housing":
             return HousingEvent(
