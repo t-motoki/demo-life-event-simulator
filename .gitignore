@@ -19,3 +19,11 @@ Thumbs.db
 # IDE
 .vscode/
 .idea/
+
+# 出力ファイル
+*.xlsx
+
+# フロントエンド
+frontend/node_modules/
+frontend/dist/
+frontend/.env.local
