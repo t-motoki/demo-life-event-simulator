@@ -56,3 +56,25 @@
 - [x] requirements.txt
 
 実行方法: `python -m src.main scenario.yaml`
+
+### フェーズ4.3: FastAPI + React フロントエンド 【完了 2026-05-10】
+
+- [x] FastAPI バックエンド（POST /simulate 等）
+- [x] React + Vite フロントエンド（シミュレーション入力・結果表示）
+
+### フェーズ4.4: 根拠付き出力（クライアントに渡せる形） 【完了 2026-05-10】
+
+- [x] src/domain/cashflow_analysis.py（貯蓄最低値・赤字期間の分析）
+- [x] src/output/excel_writer.py 拡張（「前提条件・注釈」第3シート）
+- [x] src/output/comment_generator.py（Claude API によるFPコメント生成）
+- [x] src/output/pdf_config.py（フォントパス設定）
+- [x] src/output/pdf_writer.py（WeasyPrint によるPDF生成）
+- [x] src/api/routes/comment.py（POST /generate-comment）
+- [x] src/api/routes/pdf.py（POST /download-pdf）
+- [x] src/api/schemas.py 拡張
+- [x] src/api/main.py 拡張
+- [x] フロントエンド PDFダウンロードボタン
+- [x] tests/ 161件全パス（2スキップ）
+- [ ] 実ブラウザでの AC-4-x 動作確認（未実施）
+- [ ] WSL2 環境での WeasyPrint 動作確認（libpango インストール確認）
+- [ ] ANTHROPIC_API_KEY 設定確認

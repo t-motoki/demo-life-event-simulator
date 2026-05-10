@@ -1,30 +1,29 @@
 # 作業状態
 
-最終更新: 2026-04-05
+最終更新: 2026-05-10
 
 ---
 
 ## 取り組み中のフェーズ
 
-なし（実装前）
+ep4.4「根拠付き出力 — クライアントに渡せる形へ」【完了・コミット済み】
 
 ## 直前までやっていたこと
 
-プロジェクト基盤の整備（全セットアップ完了）：
-- docs 構成の再設計（spec/ guides/ rules/ の3分類）
-- Windows 向けセットアップガイドの作成（docs/guides/setup-windows.md）
-- 要件定義ブリーフの保存と番号プレフィックスの導入（00_brief / 01_requirements）
-- サブエージェント4種の定義（planner / tester / architect / engineer）
-- 共通ワークフロールールの整備（docs/rules/00_workflow.md）
-- セッション管理スキルの追加（/session-start / /session-end）
+ep4.4 の全実装をコミット（7コミット）。
+Excel 第3シート・FPコメント生成（Claude API）・PDF ダウンロード（WeasyPrint）・フロントエンドのダウンロードボタンをそれぞれ分割コミット。
+全161テストパス（2スキップ）を確認済み。
 
 ## ブロッカー・未決事項
 
-- 計算モデルの前提（インフレ率・運用利回り・年金計算方法）がFP未確認
-- 実装はFP確認後に開始
+- フロントエンド（AC-4-x）の実ブラウザ動作確認が未実施。テストは通っているが UI 操作での検証は行っていない
+- ANTHROPIC_API_KEY の環境変数設定が実行環境で必要（未確認）
+- WeasyPrint 実行時に WSL2 側で `libpango-1.0-0 libcairo2` の apt インストールが必要（未確認）
+- FP確認待ち事項は tasks/todo.md の「FP確認待ち」セクションを参照
 
 ## 次回必要なファイル
 
-- `docs/rules/00_workflow.md`
-- `docs/spec/01_requirements.md`
 - `tasks/todo.md`
+- `docs/spec/ep4.4_acceptance.md`
+- `src/output/comment_generator.py`
+- `src/output/pdf_writer.py`
