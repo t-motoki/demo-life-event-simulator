@@ -1,6 +1,6 @@
 """Excel出力モジュール（openpyxl使用）"""
 
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 from typing import Optional
 
@@ -8,7 +8,8 @@ from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 
-from src.domain.models import CashFlowRow, HousingEvent, Scenario
+from src.domain.cashflow_analysis import analyze
+from src.domain.models import CashFlowRow, HousingEvent, IncomeModel, Scenario
 
 
 # 貯蓄残高マイナス時の背景色
@@ -168,10 +169,118 @@ def _write_input_summary_sheet(ws, scenario: Scenario) -> None:
     ws.column_dimensions["B"].width = 20
 
 
+def _write_notes_sheet(
+    ws,
+    scenario: Scenario,
+    rows: list[CashFlowRow],
+    fp_comment: str,
+    fp_name: str,
+) -> None:
+    """「前提条件・注釈」シートに書き込む。
+
+    analyze() を内部で呼び出して貯蓄最低値・赤字期間を取得する。
+    """
+    ws.title = "前提条件・注釈"
+    summary = analyze(rows)
+    today_str = date.today().isoformat()
+
+    # 収入モデルの説明テキスト
+    income_model = scenario.client.income_model
+    if income_model == IncomeModel.FLAT:
+        income_desc = "収入一定（毎年同額の収入）"
+    elif income_model == IncomeModel.RAISE_RATE:
+        rate_pct = scenario.client.raise_rate * 100
+        income_desc = f"昇給率 {rate_pct:.1f}%（毎年昇給）"
+    else:  # POST_RETIREMENT
+        income_desc = f"定年後減額（定年後年収: {scenario.client.post_retirement_income:,}円）"
+
+    # --- シート構成 ---
+    # 1行目: 作成日
+    ws.cell(row=1, column=1, value="作成日").font = Font(bold=True)
+    ws.cell(row=1, column=2, value=today_str)
+
+    # 2行目: FP 名
+    ws.cell(row=2, column=1, value="FP名").font = Font(bold=True)
+    ws.cell(row=2, column=2, value=fp_name if fp_name else "")
+
+    # 3行目: 空白
+    # （何も書かない）
+
+    # 4行目: 【前提条件】見出し
+    ws.cell(row=4, column=1, value="【前提条件】").font = Font(bold=True)
+
+    # 5行目: 収入モデル
+    ws.cell(row=5, column=1, value="収入モデル").font = Font(bold=True)
+    ws.cell(row=5, column=2, value=income_desc)
+
+    # 6行目: インフレ率
+    ws.cell(row=6, column=1, value="インフレ率").font = Font(bold=True)
+    ws.cell(row=6, column=2, value="0%（固定）")
+
+    # 7行目: 運用利回り
+    ws.cell(row=7, column=1, value="運用利回り").font = Font(bold=True)
+    ws.cell(row=7, column=2, value="0%（固定）")
+
+    # 8行目: 住宅ローン金利（HousingEvent がある場合のみ）
+    current_row = 8
+    for event in scenario.events:
+        if isinstance(event, HousingEvent):
+            rate_pct = event.interest_rate * 100
+            ws.cell(row=current_row, column=1, value="住宅ローン金利").font = Font(bold=True)
+            ws.cell(row=current_row, column=2, value=f"{rate_pct:.1f}%")
+            current_row += 1
+            break
+
+    # 空白行
+    current_row += 1
+
+    # 【注目ポイント】見出し
+    ws.cell(row=current_row, column=1, value="【注目ポイント】").font = Font(bold=True)
+    current_row += 1
+
+    # 貯蓄最低値
+    savings_low_text = (
+        f"{summary.savings_low.year}年"
+        f"（{summary.savings_low.age}歳）・"
+        f"{summary.savings_low.amount:,}円"
+    )
+    ws.cell(row=current_row, column=1, value="貯蓄残高最低時期").font = Font(bold=True)
+    ws.cell(row=current_row, column=2, value=savings_low_text)
+    current_row += 1
+
+    # 赤字期間（あれば各行に書く）
+    if summary.deficit_periods:
+        for period in summary.deficit_periods:
+            if period.start_year == period.end_year:
+                period_text = f"{period.start_year}年"
+            else:
+                period_text = f"{period.start_year}〜{period.end_year}年"
+            ws.cell(row=current_row, column=1, value="赤字期間").font = Font(bold=True)
+            ws.cell(row=current_row, column=2, value=period_text)
+            current_row += 1
+
+    # 空白行
+    current_row += 1
+
+    # FP コメント見出し
+    ws.cell(row=current_row, column=1, value="FPコメント").font = Font(bold=True)
+    current_row += 1
+
+    # FP コメント本文（Klee One フォント）
+    comment_cell = ws.cell(row=current_row, column=2, value=fp_comment if fp_comment else "")
+    comment_cell.font = Font(name="Klee One")
+
+    # 列幅の調整
+    ws.column_dimensions["A"].width = 20
+    ws.column_dimensions["B"].width = 50
+
+
 def write_excel(
     scenario: Scenario,
     rows: list[CashFlowRow],
     output_dir: str | Path = ".",
+    fp_comment: str = "",
+    fp_name: str = "",
 ) -> Path:
     """キャッシュフロー結果をExcelファイルに書き出す
 
@@ -179,6 +288,8 @@ def write_excel(
         scenario: シナリオ情報
         rows: キャッシュフロー一覧
         output_dir: 出力先ディレクトリ
+        fp_comment: FP コメント文字列（デフォルト空文字・後方互換）
+        fp_name: FP 名（デフォルト空文字・後方互換）
 
     Returns:
         生成されたExcelファイルのパス
@@ -194,6 +305,10 @@ def write_excel(
     # シート2: 入力内容確認
     ws_input = wb.create_sheet("入力内容確認")
     _write_input_summary_sheet(ws_input, scenario)
+
+    # シート3: 前提条件・注釈
+    ws_notes = wb.create_sheet("前提条件・注釈")
+    _write_notes_sheet(ws_notes, scenario, rows, fp_comment, fp_name)
 
     # ファイル名: cf_simulation_YYYYMMDD.xlsx
     today = datetime.now().strftime("%Y%m%d")
