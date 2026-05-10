@@ -51,6 +51,9 @@ function SimulatorPage() {
   // 配偶者の有無（結果テーブルの列表示制御に使う）
   const [hasSpouse, setHasSpouse] = useState(false);
 
+  // PDF ダウンロード用に最後に実行したシナリオを保持する
+  const [lastScenarioBody, setLastScenarioBody] = useState<SimulateRequestBody | null>(null);
+
   const handleSpouseChange = (data: ClientFormData | null) => {
     spouseRef.current = data;
     setHasSpouse(data !== null);
@@ -67,6 +70,7 @@ function SimulatorPage() {
       // LifeEvent と EventRequest は同一型なので変換不要
       events: events,
     };
+    setLastScenarioBody(body);
     await simulate(body);
   };
 
@@ -109,7 +113,7 @@ function SimulatorPage() {
         </Alert>
       )}
 
-      <ResultSection result={result} hasSpouse={hasSpouse} />
+      <ResultSection result={result} hasSpouse={hasSpouse} scenarioBody={lastScenarioBody} />
     </Container>
   );
 }

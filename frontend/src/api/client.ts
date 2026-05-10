@@ -1,7 +1,15 @@
 // すべての fetch 呼び出しをここに集約する
 // コンポーネントや hooks が直接 fetch を呼ばない
 
-import type { SimulateRequestBody, CashFlowRowResponse, SimulateError } from './types';
+import type {
+  SimulateRequestBody,
+  CashFlowRowResponse,
+  SimulateError,
+  DownloadPdfRequestBody,
+  GenerateCommentRequestBody,
+  GenerateCommentResponse,
+  DownloadError,
+} from './types';
 
 // Electron ビルド時は VITE_API_URL を .env.production で上書きする
 // ?? を使う理由: || は空文字を falsy 扱いするため
@@ -47,6 +55,68 @@ export async function postSimulate(
     if (e && typeof e === 'object' && 'kind' in e) throw e;
     // fetch 自体が失敗（接続なし）は network エラー
     throw { kind: 'network' } as SimulateError;
+  }
+}
+
+export async function postDownloadPdf(
+  body: DownloadPdfRequestBody,
+  timeoutMs = 30000,
+): Promise<Blob> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(`${BASE_URL}/download-pdf`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
+
+    if (!response.ok) {
+      const err: DownloadError = { kind: 'server' };
+      throw err;
+    }
+    return response.blob();
+  } catch (e) {
+    clearTimeout(timer);
+    if (e instanceof DOMException && e.name === 'AbortError') {
+      throw { kind: 'timeout' } as DownloadError;
+    }
+    if (e && typeof e === 'object' && 'kind' in e) throw e;
+    throw { kind: 'network' } as DownloadError;
+  }
+}
+
+export async function postGenerateComment(
+  body: GenerateCommentRequestBody,
+  timeoutMs = 30000,
+): Promise<GenerateCommentResponse> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(`${BASE_URL}/generate-comment`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
+
+    if (!response.ok) {
+      const err: DownloadError = { kind: 'server' };
+      throw err;
+    }
+    return response.json();
+  } catch (e) {
+    clearTimeout(timer);
+    if (e instanceof DOMException && e.name === 'AbortError') {
+      throw { kind: 'timeout' } as DownloadError;
+    }
+    if (e && typeof e === 'object' && 'kind' in e) throw e;
+    throw { kind: 'network' } as DownloadError;
   }
 }
 

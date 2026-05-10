@@ -104,3 +104,27 @@ export type SimulateError =
   | { kind: 'timeout' }
   | { kind: 'validation'; detail: string }
   | { kind: 'server' };
+
+// ---------------------------------------------------------------------------
+// ep4.4: PDF ダウンロード・FP コメント生成の型
+// ---------------------------------------------------------------------------
+
+export interface DownloadPdfRequestBody {
+  scenario: SimulateRequestBody;
+  rows: CashFlowRowResponse[];
+  fp_comment: string;
+}
+
+export interface GenerateCommentRequestBody {
+  scenario: SimulateRequestBody;
+  rows: CashFlowRowResponse[];
+}
+
+export interface GenerateCommentResponse {
+  comment: string;
+}
+
+export type DownloadError =
+  | { kind: 'network' }
+  | { kind: 'timeout' }
+  | { kind: 'server' };
