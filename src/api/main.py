@@ -7,7 +7,7 @@ CUI（src/main.py）と並行して動作する Web API エントリポイント
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from src.api.routes import health, simulate
+from src.api.routes import comment, health, pdf, simulate
 
 app = FastAPI(
     title="ライフイベント家計シミュレーター API",
@@ -26,6 +26,8 @@ app.add_middleware(
 
 app.include_router(health.router)
 app.include_router(simulate.router)
+app.include_router(comment.router)
+app.include_router(pdf.router)
 
 
 if __name__ == "__main__":

@@ -247,6 +247,43 @@ def to_domain_scenario(req: SimulateRequest) -> Scenario:
     )
 
 
+# ---------------------------------------------------------------------------
+# ep4.4 追加スキーマ: コメント生成・PDF ダウンロード
+# ---------------------------------------------------------------------------
+
+class GenerateCommentRequest(BaseModel):
+    scenario: SimulateRequest
+    rows: list[CashFlowRowResponse]
+
+
+class GenerateCommentResponse(BaseModel):
+    comment: str
+
+
+class DownloadPdfRequest(BaseModel):
+    scenario: SimulateRequest
+    rows: list[CashFlowRowResponse]
+    fp_comment: str = ""
+
+
+def to_domain_rows(rows: list[CashFlowRowResponse]) -> list[CashFlowRow]:
+    """CashFlowRowResponse 一覧をドメインの CashFlowRow 一覧に変換する"""
+    return [
+        CashFlowRow(
+            year=row.year,
+            age_client=row.age_client,
+            age_spouse=row.age_spouse,
+            income_total=row.income_total,
+            expense_total=row.expense_total,
+            loan_deduction=row.loan_deduction,
+            net=row.net,
+            savings=row.savings,
+            events_label=row.events_label,
+        )
+        for row in rows
+    ]
+
+
 def to_response(rows: list[CashFlowRow]) -> list[CashFlowRowResponse]:
     """ドメインの CashFlowRow 一覧をレスポンス形式に変換する"""
     return [
