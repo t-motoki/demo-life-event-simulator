@@ -1,3 +1,8 @@
+---
+name: implement
+description: planner → tester → architect → engineer の順で実装を orchestrate する。「実装してください」と言われたときに呼ぶ。
+---
+
 実装を開始します。
 
 以下の手順で進めてください：
