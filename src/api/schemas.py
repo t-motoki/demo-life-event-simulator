@@ -6,9 +6,10 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Annotated, Literal, Optional, Union
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 # ドメインの Enum をそのまま型ヒントに使う（Pydantic v2 が文字列と自動マッピングする）
 from src.domain.models import (
@@ -300,3 +301,40 @@ def to_response(rows: list[CashFlowRow]) -> list[CashFlowRowResponse]:
         )
         for row in rows
     ]
+
+
+# ---------------------------------------------------------------------------
+# ep4.5 追加スキーマ: クライアントデータ永続化
+# ---------------------------------------------------------------------------
+
+
+class ClientSaveRequest(BaseModel):
+    """POST /clients, PUT /clients/{id} のリクエストボディ"""
+
+    name: str
+    scenario: dict
+
+    @field_validator("name")
+    @classmethod
+    def name_must_not_be_blank(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("name は空にできません")
+        return v.strip()
+
+
+class ClientResponse(BaseModel):
+    """POST/PUT/GET /clients/{id} のレスポンス（scenario 含む）"""
+
+    id: int
+    name: str
+    scenario: dict
+    created_at: datetime
+    updated_at: datetime
+
+
+class ClientListItem(BaseModel):
+    """GET /clients の一覧要素（scenario を含まない）"""
+
+    id: int
+    name: str
+    updated_at: datetime
