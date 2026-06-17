@@ -9,11 +9,26 @@ import type {
   GenerateCommentRequestBody,
   GenerateCommentResponse,
   DownloadError,
+  ClientListItem,
+  ClientResponse,
+  SaveClientBody,
+  ClientError,
 } from './types';
 
-// Electron ビルド時は VITE_API_URL を .env.production で上書きする
+// Electron から注入された apiBaseUrl を最優先で使う
 // ?? を使う理由: || は空文字を falsy 扱いするため
-const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
+declare global {
+  interface Window {
+    electronAPI?: {
+      apiBaseUrl: string;
+    };
+  }
+}
+
+const BASE_URL =
+  window.electronAPI?.apiBaseUrl
+  ?? import.meta.env.VITE_API_URL
+  ?? 'http://localhost:8000';
 
 export async function postSimulate(
   body: SimulateRequestBody,
@@ -117,6 +132,117 @@ export async function postGenerateComment(
     }
     if (e && typeof e === 'object' && 'kind' in e) throw e;
     throw { kind: 'network' } as DownloadError;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// ep4.5: クライアント CRUD
+// ---------------------------------------------------------------------------
+
+// クライアント CRUD 共通のエラーハンドリング
+function handleClientError(e: unknown): never {
+  if (e instanceof DOMException && e.name === 'AbortError') {
+    throw { kind: 'timeout' } as ClientError;
+  }
+  if (e && typeof e === 'object' && 'kind' in e) throw e;
+  throw { kind: 'network' } as ClientError;
+}
+
+async function parseClientErrorResponse(response: Response): Promise<never> {
+  const json = await response.json().catch(() => ({}));
+  if (response.status === 404) {
+    throw { kind: 'not_found' } as ClientError;
+  }
+  if (response.status === 422) {
+    const detail = typeof json.detail === 'string' ? json.detail : '入力内容に誤りがあります';
+    throw { kind: 'validation', detail } as ClientError;
+  }
+  throw { kind: 'server' } as ClientError;
+}
+
+export async function getClients(timeoutMs = 10000): Promise<ClientListItem[]> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(`${BASE_URL}/clients`, {
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
+    if (!response.ok) return parseClientErrorResponse(response);
+    return response.json();
+  } catch (e) {
+    clearTimeout(timer);
+    return handleClientError(e);
+  }
+}
+
+export async function getClient(id: number, timeoutMs = 10000): Promise<ClientResponse> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(`${BASE_URL}/clients/${id}`, {
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
+    if (!response.ok) return parseClientErrorResponse(response);
+    return response.json();
+  } catch (e) {
+    clearTimeout(timer);
+    return handleClientError(e);
+  }
+}
+
+export async function postClient(body: SaveClientBody, timeoutMs = 10000): Promise<ClientResponse> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(`${BASE_URL}/clients`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
+    if (!response.ok) return parseClientErrorResponse(response);
+    return response.json();
+  } catch (e) {
+    clearTimeout(timer);
+    return handleClientError(e);
+  }
+}
+
+export async function putClient(id: number, body: SaveClientBody, timeoutMs = 10000): Promise<ClientResponse> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(`${BASE_URL}/clients/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
+    if (!response.ok) return parseClientErrorResponse(response);
+    return response.json();
+  } catch (e) {
+    clearTimeout(timer);
+    return handleClientError(e);
+  }
+}
+
+export async function deleteClient(id: number, timeoutMs = 10000): Promise<void> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(`${BASE_URL}/clients/${id}`, {
+      method: 'DELETE',
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
+    if (!response.ok) return parseClientErrorResponse(response);
+  } catch (e) {
+    clearTimeout(timer);
+    return handleClientError(e);
   }
 }
 

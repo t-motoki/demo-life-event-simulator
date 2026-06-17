@@ -6,19 +6,31 @@ import { SpouseToggle } from './SpouseToggle';
 import type { ClientFormData, ScenarioCommonData } from '../../types/scenario';
 
 interface Props {
+  defaultClient?: Partial<ClientFormData>;
+  defaultSpouse?: ClientFormData | null;
+  defaultCommon?: Partial<ScenarioCommonData>;
   onClientChange: (data: ClientFormData) => void;
   onSpouseChange: (data: ClientFormData | null) => void;
   onCommonChange: (data: ScenarioCommonData) => void;
 }
 
-export function ClientSection({ onClientChange, onSpouseChange, onCommonChange }: Props) {
-  const [spouseVisible, setSpouseVisible] = useState(false);
+export function ClientSection({
+  defaultClient,
+  defaultSpouse,
+  defaultCommon,
+  onClientChange,
+  onSpouseChange,
+  onCommonChange,
+}: Props) {
+  // 配偶者データが非 null なら初期状態で表示する
+  const [spouseVisible, setSpouseVisible] = useState(defaultSpouse != null);
 
   const { register, watch, formState: { errors } } = useForm<ScenarioCommonData>({
     defaultValues: {
       savings_initial: 0,
       end_age: 90,
       start_year: new Date().getFullYear(),
+      ...defaultCommon,
     },
     mode: 'onChange',
   });
@@ -84,7 +96,7 @@ export function ClientSection({ onClientChange, onSpouseChange, onCommonChange }
       </Box>
 
       {/* 本人情報 */}
-      <ClientForm title="本人情報" onChange={onClientChange} />
+      <ClientForm title="本人情報" defaultValues={defaultClient} onChange={onClientChange} />
 
       {/* 配偶者トグルと配偶者フォーム */}
       <Box sx={{ mt: 3 }}>
@@ -92,7 +104,7 @@ export function ClientSection({ onClientChange, onSpouseChange, onCommonChange }
         {/* 非表示時はアンマウントして React Hook Form の状態をリセットする */}
         {spouseVisible && (
           <Box sx={{ mt: 2 }}>
-            <ClientForm title="配偶者情報" onChange={onSpouseChange} />
+            <ClientForm title="配偶者情報" defaultValues={defaultSpouse ?? undefined} onChange={onSpouseChange} />
           </Box>
         )}
       </Box>

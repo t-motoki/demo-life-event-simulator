@@ -128,3 +128,37 @@ export type DownloadError =
   | { kind: 'network' }
   | { kind: 'timeout' }
   | { kind: 'server' };
+
+// ---------------------------------------------------------------------------
+// ep4.5: クライアント管理 CRUD の型
+// ---------------------------------------------------------------------------
+
+// GET /clients の一覧要素
+export interface ClientListItem {
+  id: number;
+  name: string;
+  updated_at: string; // ISO 8601
+}
+
+// GET /clients/{id}, POST /clients, PUT /clients/{id} のレスポンス
+export interface ClientResponse {
+  id: number;
+  name: string;
+  scenario: SimulateRequestBody;
+  created_at: string;
+  updated_at: string;
+}
+
+// POST /clients, PUT /clients/{id} のリクエストボディ
+export interface SaveClientBody {
+  name: string;
+  scenario: SimulateRequestBody;
+}
+
+// クライアント CRUD 操作のエラー（既存の discriminated union パターンに合わせる）
+export type ClientError =
+  | { kind: 'network' }
+  | { kind: 'timeout' }
+  | { kind: 'not_found' }
+  | { kind: 'validation'; detail: string }
+  | { kind: 'server' };

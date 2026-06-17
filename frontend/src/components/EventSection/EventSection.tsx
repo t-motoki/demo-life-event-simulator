@@ -9,7 +9,8 @@ import type { Dispatch } from 'react';
 type EventAction =
   | { type: 'ADD'; event: LifeEvent }
   | { type: 'EDIT'; index: number; event: LifeEvent }
-  | { type: 'DELETE'; index: number };
+  | { type: 'DELETE'; index: number }
+  | { type: 'SET_ALL'; events: LifeEvent[] };
 
 interface Props {
   events: LifeEvent[];

@@ -5,7 +5,8 @@ import type { LifeEvent } from '../types/scenario';
 type EventAction =
   | { type: 'ADD'; event: LifeEvent }
   | { type: 'EDIT'; index: number; event: LifeEvent }
-  | { type: 'DELETE'; index: number };
+  | { type: 'DELETE'; index: number }
+  | { type: 'SET_ALL'; events: LifeEvent[] };
 
 function reducer(state: LifeEvent[], action: EventAction): LifeEvent[] {
   switch (action.type) {
@@ -15,6 +16,8 @@ function reducer(state: LifeEvent[], action: EventAction): LifeEvent[] {
       return state.map((e, i) => (i === action.index ? action.event : e));
     case 'DELETE':
       return state.filter((_, i) => i !== action.index);
+    case 'SET_ALL':
+      return action.events;
   }
 }
 

@@ -3,16 +3,17 @@ import { Box, Paper, TextField, Typography } from '@mui/material';
 import type { MonthlyExpensesRequest } from '../../api/types';
 
 interface Props {
+  defaultValues?: Partial<MonthlyExpensesRequest>;
   onExpenseChange: (data: MonthlyExpensesRequest) => void;
 }
 
-export function ExpenseSection({ onExpenseChange }: Props) {
+export function ExpenseSection({ defaultValues: defaultValuesProp, onExpenseChange }: Props) {
   const {
     register,
     watch,
     formState: { errors },
   } = useForm<MonthlyExpensesRequest>({
-    defaultValues: { living: 0, insurance: 0, other: 0 },
+    defaultValues: { living: 0, insurance: 0, other: 0, ...defaultValuesProp },
     mode: 'onChange',
   });
 
