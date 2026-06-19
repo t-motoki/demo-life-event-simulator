@@ -78,3 +78,30 @@
 - [ ] 実ブラウザでの AC-4-x 動作確認（未実施）
 - [ ] WSL2 環境での WeasyPrint 動作確認（libpango インストール確認）
 - [ ] ANTHROPIC_API_KEY 設定確認
+
+### フェーズ4.5: クライアント永続化・管理UI・デスクトップアプリ化 【コミット済み 2026-06-17】
+
+Phase 1: クライアントデータ永続化（8bf20f5）
+
+- [x] src/db/models.py・client_repository.py・sqlite_repository.py（SQLAlchemy + Repository パターン）
+- [x] src/api/routes/clients.py（CRUD: GET/POST/PUT/DELETE /clients）
+- [x] src/api/dependencies.py・schemas.py 拡張
+- [x] tests/db/・tests/api/test_clients.py
+- [x] docs/design/ep4.5_client_persistence_design.md・_test_spec.md
+
+Phase 2: クライアント管理 UI（3097602）
+
+- [x] frontend ClientManager/SaveDialog コンポーネント・useClients hook
+- [x] 選択ドロップダウン・保存・名前を付けて保存・削除（key-based remount でフォーム復元）
+- [x] frontend テスト（ClientManager・useClients・clientCrud）
+- [x] docs/design/ep4.5_frontend_design.md・_test_spec.md
+
+Phase 3: Electron デスクトップアプリ化（bed2b87）
+
+- [x] PyInstaller で FastAPI を実行ファイル化（api-server.spec）
+- [x] electron/（main.js・preload.js・builder.config.js）— 空きポート自動確保・API 自動起動/停止
+- [x] Windows NSIS インストーラー対応
+- [x] docs/design/ep4.5_electron_design.md
+
+- [ ] ep4.5 全テストのパス確認（テストコードは存在。実行確認は tasks 未記録）
+- [ ] Electron 実機ビルド・起動の動作確認（未記録）
