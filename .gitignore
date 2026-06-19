@@ -33,3 +33,7 @@ test-results/
 frontend/node_modules/
 frontend/dist/
 frontend/.env.local
+
+# Electron / デスクトップアプリビルド成果物
+electron/node_modules/
+output/electron-dist/
