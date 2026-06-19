@@ -23,6 +23,12 @@ Thumbs.db
 # 出力ファイル
 *.xlsx
 
+# データベース（実行時生成）
+*.db
+
+# テスト出力
+test-results/
+
 # フロントエンド
 frontend/node_modules/
 frontend/dist/
