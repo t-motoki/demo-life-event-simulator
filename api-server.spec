@@ -25,6 +25,9 @@ a = Analysis(
     ],
 )
 pyz = PYZ(a.pure)
-exe = EXE(pyz, a.scripts, name='api-server', console=True)
 # --onedir: 起動速度を優先（Electron インストーラーに含めるため単一 exe は不要）
+# exclude_binaries=True で EXE をスタブ化し、バイナリ/データは COLLECT 側にまとめる。
+# これを省くと EXE が dist/api-server（ファイル）を作り、COLLECT の dist/api-server
+# （ディレクトリ）と衝突してビルドが失敗する。
+exe = EXE(pyz, a.scripts, exclude_binaries=True, name='api-server', console=True)
 coll = COLLECT(exe, a.binaries, a.datas, name='api-server')
