@@ -36,7 +36,16 @@ app.include_router(clients.router)
 
 
 if __name__ == "__main__":
+    import sys
+
     import uvicorn
 
     port = int(os.environ.get("LES_PORT", "49152"))
-    uvicorn.run("src.api.main:app", host="0.0.0.0", port=port, reload=True)
+    # PyInstaller で凍結した実行ファイルでは reload を使えない。
+    # reload=True は import 文字列でワーカーを再起動する仕組みで、凍結時は
+    # 自プロセスを reloader として無限に再生成してしまいワーカーが立ち上がらない。
+    # デスクトップアプリ用途では外部公開も不要なので 127.0.0.1 に束ねる。
+    if getattr(sys, "frozen", False):
+        uvicorn.run(app, host="127.0.0.1", port=port)
+    else:
+        uvicorn.run("src.api.main:app", host="0.0.0.0", port=port, reload=True)
