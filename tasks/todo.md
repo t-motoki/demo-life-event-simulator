@@ -104,4 +104,11 @@ Phase 3: Electron デスクトップアプリ化（bed2b87）
 - [x] docs/design/ep4.5_electron_design.md
 
 - [ ] ep4.5 全テストのパス確認（テストコードは存在。実行確認は tasks 未記録）
-- [ ] Electron 実機ビルド・起動の動作確認（未記録）
+- [x] WSL2 での実機ビルド確認（2026-06-20）。ビルド時に3つの実バグを修正：
+      ① api-server.spec に exclude_binaries 欠落（onedir 衝突）
+      ② main.py が凍結時も reload=True でプロセス無限増殖
+      ③ electron/package.json で electron が dependencies（builder 停止）
+      → api-server EXE は /health=200 を確認。AppImage(185MB)・snap(156MB) 生成、
+        resources に api-server・frontend 同梱を確認
+- [ ] Electron GUI の起動・操作確認（WSLg 対話セッションでユーザーが実施予定。
+      起動: output/electron-dist/ライフイベント家計シミュレーター-1.0.0.AppImage）
