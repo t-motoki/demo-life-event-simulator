@@ -1,15 +1,15 @@
 {
   "name": "life-event-simulator",
   "version": "1.0.0",
+  "description": "FP向けライフイベント家計シミュレーターのデスクトップアプリ",
+  "author": "life-event-simulator",
   "main": "main.js",
   "scripts": {
     "dev": "electron .",
     "build": "electron-builder --config builder.config.js"
   },
-  "dependencies": {
-    "electron": "^36.0.0"
-  },
   "devDependencies": {
+    "electron": "^36.0.0",
     "electron-builder": "^26.0.0"
   }
 }
