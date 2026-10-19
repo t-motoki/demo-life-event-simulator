@@ -105,7 +105,7 @@ git clone https://github.com/t-motoki/demo-life-event-simulator.git
    python src/main.py
    ```
 
-3. 処理が完了すると、フォルダ内に Excel ファイルが生成されます。
+3. 処理が完了すると、ツールのフォルダの中の `data\output` フォルダに Excel ファイルが生成されます（フォルダが無ければ自動で作られます）。
 
 ---
 

@@ -92,12 +92,18 @@ FPとの合意（計算モデルの前提）が確認できていない状態で
 src/
   domain/        ← 計算ロジック・エンティティ（外部依存なし）
   input/         ← 入力データの読み取り・バリデーション
-  output/        ← Excel 出力
-  main.py        ← エントリーポイント
+  output/        ← Excel・PDF 出力・FP コメントの生成
+  api/           ← API サーバー（FastAPI）・Repository の組み立て
+  db/            ← 顧客 DB（Repository）
+  data_paths.py  ← 顧客データの既定の置き場所（data/ の下）
+  main.py        ← エントリーポイント（CLI）
 tests/
   domain/        ← 計算ロジックのテスト（最重要）
   input/
   output/
+  api/
+  db/
+  test_main.py   ← CLI（src/main.py）のテスト
 docs/
   rules/         ← ワークフロー・共通ルール（このファイル）
   spec/          ← FPと合意した仕様・要件
@@ -116,4 +122,3 @@ data/            ← git に入れないローカルの顧客データ（.gitign
 - 名前と置き場所だけで中身が分かるようにする。既存のファイルがたまたまある場所に合わせて置かない
 - 顧客データ（実データのシナリオ・DB・出力）は `data/` の下にだけ置く。`.gitignore`・Read の deny・guard の対象は `data/` 1か所で済ませる
 - 新しい置き場を作るときは、この構成図に足してから作る
-- **移行中（2026-10-20〜）**: `clients.db` と出力の Excel の既定の置き場所はまだリポジトリ直下（`src/api/dependencies.py`・`src/db/sqlite_repository.py`・`src/output/excel_writer.py`）。`tasks/todo.md`「開発基盤の安全設定」タスク0.5 で `data/` に移す

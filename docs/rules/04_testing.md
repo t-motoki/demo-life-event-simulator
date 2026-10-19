@@ -18,7 +18,12 @@ tests/
   domain/     test_<モジュール名>.py   例: test_housing_loan.py
   input/      test_<モジュール名>.py   例: test_validator.py
   output/     test_<モジュール名>.py   例: test_excel_writer.py
+  api/        test_<モジュール名>.py   例: test_dependencies.py
+  db/         test_<モジュール名>.py   例: test_sqlite_repository.py
+  test_main.py                         src/main.py（CLI）のテスト
 ```
+
+`tests/` は `src/` の構成を写す。`src/` 直下のファイルのテストは `tests/` 直下に置く。
 
 ---
 

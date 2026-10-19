@@ -28,6 +28,33 @@ FP（ファイナンシャルプランナー）がクライアントとの面談
 
 ---
 
+## データの置き場所
+
+顧客データ（実データのシナリオ・顧客 DB・出力した Excel）は `data/` の下にだけ置きます。`data/` の下は git に入りません（`.gitignore`）。
+
+| 置くもの | 場所 |
+| --- | --- |
+| 実データのシナリオ | `data/scenarios/`（自分で作る） |
+| サンプルのシナリオ | リポジトリ直下の `scenario.yaml`（git 管理） |
+| 出力した Excel | `data/output/cf_simulation_YYYYMMDD.xlsx`（無ければ自動で作る） |
+| 顧客 DB（開発時の API サーバー） | `data/clients.db`（無ければ自動で作る。環境変数 `LES_DB_PATH` で変えられる） |
+| 顧客 DB（デスクトップアプリ版） | アプリのデータフォルダ（Electron の `userData`）の `clients.db` |
+
+コマンドは**リポジトリ直下で実行**します。相対パスは実行した場所（作業ディレクトリ）を基準にするためです。
+
+```bash
+# 実データのシナリオの置き場を作る（初回だけ）
+mkdir -p data/scenarios
+
+# 実データのシナリオから Excel を出力する
+python -m src.main data/scenarios/<名前>.yaml
+
+# サンプルで試す（出力先は同じ data/output/）
+python -m src.main scenario.yaml
+```
+
+---
+
 ## セットアップ（Windows）
 
 [docs/guides/setup-windows.md](docs/guides/setup-windows.md) を参照してください。
