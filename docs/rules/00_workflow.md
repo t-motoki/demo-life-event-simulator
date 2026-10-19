@@ -105,4 +105,15 @@ docs/
 tasks/
   todo.md        ← 現在のタスク・FP確認待ち事項
   lessons.md     ← 過去の学びと教訓
+data/            ← git に入れないローカルの顧客データ（.gitignore・AI の読み取り禁止の対象）
+  scenarios/     ← 実データのシナリオ（サンプルはリポジトリ直下の scenario.yaml）
+  clients.db     ← 顧客 DB（開発時。Electron 版は userData に置く）
+  output/        ← 出力した Excel
 ```
+
+### 配置の原則
+
+- 名前と置き場所だけで中身が分かるようにする。既存のファイルがたまたまある場所に合わせて置かない
+- 顧客データ（実データのシナリオ・DB・出力）は `data/` の下にだけ置く。`.gitignore`・Read の deny・guard の対象は `data/` 1か所で済ませる
+- 新しい置き場を作るときは、この構成図に足してから作る
+- **移行中（2026-10-20〜）**: `clients.db` と出力の Excel の既定の置き場所はまだリポジトリ直下（`src/api/dependencies.py`・`src/db/sqlite_repository.py`・`src/output/excel_writer.py`）。`tasks/todo.md`「開発基盤の安全設定」タスク0.5 で `data/` に移す
