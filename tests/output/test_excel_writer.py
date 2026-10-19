@@ -1,5 +1,8 @@
 """Excel出力のテスト"""
 
+from datetime import datetime
+from pathlib import Path
+
 import openpyxl
 import pytest
 
@@ -314,3 +317,63 @@ class TestNotesSheet:
         ws = wb["前提条件・注釈"]
         # シートが存在することのみ確認（空コメントでも正常に書き込まれる）
         assert ws is not None
+
+
+class TestDefaultOutputDir:
+    """Excel の既定の出力先とフォルダの作成。
+
+    既定は作業ディレクトリ基準の相対パスなので、作業ディレクトリを tmp_path に移す
+    （リポジトリ直下に data/ や xlsx を作らないため）。
+    """
+
+    @staticmethod
+    def _expected_name() -> str:
+        return f"cf_simulation_{datetime.now():%Y%m%d}.xlsx"
+
+    def test_出力先を渡さなければdata_outputに書く(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        scenario = _base_scenario()
+
+        path = write_excel(scenario, simulate(scenario))
+
+        assert path == Path("data") / "output" / self._expected_name()
+        assert (tmp_path / path).is_file()
+        assert list(tmp_path.glob("*.xlsx")) == []
+
+    def test_出力先フォルダが無ければ親ごと作る(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        assert not (tmp_path / "data").exists()
+        scenario = _base_scenario()
+
+        path = write_excel(scenario, simulate(scenario))
+
+        assert (tmp_path / "data" / "output").is_dir()
+        assert (tmp_path / path).is_file()
+
+    def test_存在しない出力先を明示したら作って書く(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        scenario = _base_scenario()
+
+        path = write_excel(scenario, simulate(scenario), output_dir=tmp_path / "a" / "b")
+
+        assert path == tmp_path / "a" / "b" / self._expected_name()
+        assert path.is_file()
+        assert not (tmp_path / "data").exists()
+
+    def test_出力先にファイルを渡したらエラー(self, tmp_path):
+        not_a_dir = tmp_path / "file.txt"
+        not_a_dir.write_text("x", encoding="utf-8")
+        scenario = _base_scenario()
+
+        with pytest.raises(OSError):
+            write_excel(scenario, simulate(scenario), output_dir=not_a_dir)
+
+    def test_同じ日に2回出力すると上書きする(self, tmp_path):
+        scenario = _base_scenario()
+        rows = simulate(scenario)
+
+        first = write_excel(scenario, rows, output_dir=tmp_path)
+        second = write_excel(scenario, rows, output_dir=tmp_path)
+
+        assert first == second
+        assert list(tmp_path.glob("*.xlsx")) == [first]

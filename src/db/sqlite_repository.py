@@ -45,9 +45,12 @@ def _to_summary(model: ClientModel) -> ClientSummary:
 
 class SqliteClientRepository(ClientRepository):
 
-    def __init__(self, db_url: str = "sqlite:///clients.db") -> None:
+    def __init__(self, db_url: str) -> None:
         """SQLite に接続し、テーブルを自動作成する。
 
+        既定値は持たない。既定の置き場所は src/data_paths.py にあり、
+        src/api/dependencies.py が URL を組み立てて渡す（既定値が2か所でずれないように）。
+        ファイルの URL の親フォルダは呼び出し側が用意する。
         テスト時は db_url="sqlite:///:memory:" を渡す。
         :memory: の場合は StaticPool を使い、スレッド間で同一接続を共有する。
         """

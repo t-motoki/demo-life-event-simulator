@@ -210,3 +210,17 @@ class TestDelete:
     def test_delete_when_nonexistent_id_then_raises_error(self, repository):
         with pytest.raises(ValueError):
             repository.delete(99999)
+
+
+class TestDbUrlRequired:
+    def test_db_urlを渡さないとTypeError(self):
+        # 既定値は src/api/dependencies.py の1か所だけに置く。ここに2か所目が戻らないこと
+        with pytest.raises(TypeError):
+            SqliteClientRepository()
+
+    def test_ファイルのURLを明示したらその場所に作る(self, tmp_path):
+        db_file = tmp_path / "x.db"
+
+        SqliteClientRepository(db_url=f"sqlite:///{db_file}")
+
+        assert db_file.is_file()

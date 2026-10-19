@@ -8,6 +8,7 @@ from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 
+from src.data_paths import DEFAULT_OUTPUT_DIR
 from src.domain.cashflow_analysis import analyze
 from src.domain.models import CashFlowRow, HousingEvent, IncomeModel, Scenario
 
@@ -278,7 +279,7 @@ def _write_notes_sheet(
 def write_excel(
     scenario: Scenario,
     rows: list[CashFlowRow],
-    output_dir: str | Path = ".",
+    output_dir: str | Path = DEFAULT_OUTPUT_DIR,
     fp_comment: str = "",
     fp_name: str = "",
 ) -> Path:
@@ -287,7 +288,7 @@ def write_excel(
     Args:
         scenario: シナリオ情報
         rows: キャッシュフロー一覧
-        output_dir: 出力先ディレクトリ
+        output_dir: 出力先ディレクトリ（既定は data/output。無ければ親ごと作る）
         fp_comment: FP コメント文字列（デフォルト空文字・後方互換）
         fp_name: FP 名（デフォルト空文字・後方互換）
 
@@ -313,7 +314,12 @@ def write_excel(
     # ファイル名: cf_simulation_YYYYMMDD.xlsx
     today = datetime.now().strftime("%Y%m%d")
     filename = f"cf_simulation_{today}.xlsx"
-    output_path = Path(output_dir) / filename
+    output_dir = Path(output_dir)
+    # data/ は git に入らないので clone 直後は無い。保存の直前に作るのは、
+    # 呼び出し側が入力の読み込み・検証に失敗したときに空のフォルダを残さないため。
+    # 既存のファイルを渡されたら FileExistsError になり、黙って別の場所には書かない
+    output_dir.mkdir(parents=True, exist_ok=True)
+    output_path = output_dir / filename
 
     wb.save(output_path)
     return output_path
