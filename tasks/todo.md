@@ -112,3 +112,136 @@ Phase 3: Electron デスクトップアプリ化（bed2b87）
         resources に api-server・frontend 同梱を確認
 - [ ] Electron GUI の起動・操作確認（WSLg 対話セッションでユーザーが実施予定。
       起動: output/electron-dist/ライフイベント家計シミュレーター-1.0.0.AppImage）
+
+---
+
+## 実装計画: 開発基盤の安全設定（AI駆動開発設計思想 段階1 の移植）
+
+作成日: 2026-10-18（planner）
+
+### 目標
+
+Claude Code が LES で動くとき、次の3つが仕組みで止まる状態にする。計算モデルには触れない（`src/` の変更は、顧客データの既定の置き場所を `data/` に移す2か所だけ＝タスク0.5）。
+
+1. 秘密・顧客データ（`.env`・`clients.db` など）を Read ツールでも Bash（`cat`・`sqlite3`・`python -c` など）でも読まない
+2. 安全設定そのもの（`.claude/settings*.json`・`.claude/hooks/**`）を人の承認なしに書き換えない
+3. 取り返しのつかない git / rm（`git push -f`・`git reset --hard`・`rm -rf .` など）を止める
+
+移植元: 別リポジトリで導入済みの guard フック（コミット 57cb314・b421b54。設計 `docs/design/guard_hook.md`・仕様 `docs/design/test_spec_guard_hook.md`）。
+
+### 前提として分かっていること（2026-10-18 調査）
+
+- `.claude/settings.json` に permissions（allow・ask・deny）が無い。`.claude/hooks/` も無い
+- **既存の2フックは今も動いていない可能性が高い**。`$CLAUDE_TOOL_INPUT_FILE_PATH` を見ているが、Claude Code はフックの入力を環境変数ではなく標準入力の JSON（`tool_input.file_path`・絶対パス）で渡す。仮に値が入っても絶対パスなので `^src/` に一致しない。→ 「パスを `$CLAUDE_PROJECT_DIR` に直す」だけでは足りず、標準入力を読むスクリプトに作り直す（TDD 対象）
+- pytest: `.venv/bin/python -m pytest`（Python 3.14.2・`pytest.ini` はマーカー `slow` の定義のみ・197件収集）。フックの `python3` は pyenv の 3.14
+- `tests/` は層ごとのパッケージ（各ディレクトリに `__init__.py`）。guard のテストは `tests/hooks/` に置く
+- `clients.db`: 開発時はルート（`LES_DB_PATH` 既定値）、Electron 版は `app.getPath('userData')/clients.db`（リポジトリの外）。`*.db`・`*.xlsx` は `.gitignore` 済み
+- `cf_simulation_20260407.xlsx`・`cf_simulation_20260411.xlsx` がルートにある（`scenario.yaml` から作った出力の可能性が高いが未確認）
+- `output/` の中身は Electron のビルド成果物だけ（顧客データは無い）
+- `scenario.yaml` と `frontend/.env.development` は git 管理されている（リモートは公開リポジトリ demo-life-event-simulator）
+- LES 用の個人メモリ（`~/.claude/projects/-home-tmotoki-pjt-life-event-simulator/memory/`）は**存在しない**。棚卸しは不要
+- `.claude/settings.local.json`（348B・git 管理外）は中身を誰も開いていない
+
+### タスク一覧
+
+着手順は データの置き場所 → 設定 → フック → guard → 配線 → settings.local.json → 実機確認。
+
+- [x] 0. 運営者に確認する（2026-10-20 回答済み。下の「運営者の決定」）
+- [ ] 0.5. **TDD 対象**: 顧客データを `data/` にまとめる（planner → tester → architect → engineer → reviewer）
+  - 理由: 実データのシナリオの置き場を作るにあたり、顧客データが直下の `clients.db`・直下の `cf_simulation_*.xlsx`・新しいフォルダの3か所に散らばるのを避ける（`CLAUDE.md` コア原則「構成は直感的に」・`docs/rules/00_workflow.md`「配置の原則」）。`.gitignore`・deny・guard の対象を `data/` 1か所にする
+  - 変えるもの: DB の既定パス（`src/api/dependencies.py` の `LES_DB_PATH` 既定値・`src/db/sqlite_repository.py` の既定 URL）→ `data/clients.db`、Excel の既定の出力先（`src/output/excel_writer.py` の `output_dir`、`src/main.py` からの呼び出し）→ `data/output/`。出力先のフォルダが無ければ作る
+  - 変えないもの: Electron 版（`LES_DB_PATH` を `userData` で明示しているので影響なし）・計算モデル・API の応答
+  - `data/` を `.gitignore` に足す。`data/scenarios/` はフォルダだけ作る（中身は git に入れない）
+  - README に「データの置き場所」の節を足す（実データのシナリオは `data/scenarios/` に置き `python -m src.main data/scenarios/<名前>.yaml` で実行する／サンプルは直下の `scenario.yaml`／出力は `data/output/`）
+  - 既存の直下の `clients.db` と `cf_simulation_*.xlsx` 2つは**運営者が自分で `data/` に移す**（AI は中身に触れない）
+- [ ] 1. **設定のみ（TDD 対象外）**: `.claude/settings.json` に permissions を足す（Edit ツール・承認ダイアログで人が確認）
+  - deny: 移植元と同じ `.env` 系・`*.pem`・`id_rsa*`・`~/claude-settings-backup/**` に加え、`Read(./data/**)`（顧客データ一式）・`Read(./.claude/settings.local.json)`・`Read(**/*.db)`・`Read(**/*.sqlite*)`・`Read(**/*.xlsx)`（0 の決定1）・`Read(~/.config/**/clients.db)`（Electron の保存先・決定4）。`frontend/.env.development` は例外（決定3）
+  - ask: 移植元と同じ3件（`Edit(./.claude/settings.json)`・`Edit(./.claude/settings.local.json)`・`Edit(./.claude/hooks/**)`）
+  - allow: 読むだけのコマンドに絞る（`git status/diff/log/show`・`.venv/bin/python -m pytest:*`）（決定6）
+  - 再起動するまで効かない。確認は 6 でまとめて行う
+- [ ] 2. **TDD 対象**: 既存2フックを `.claude/hooks/` のスクリプトに作り直す（tester → architect → engineer → reviewer）
+  - `post_tool_run_tests.py`: 標準入力の `tool_input.file_path` が `$CLAUDE_PROJECT_DIR/src/` 配下なら `"$CLAUDE_PROJECT_DIR"/.venv/bin/python -m pytest tests/ -q --tb=short` を実行（現状は `python`＝venv 外を使っている）。`-m "not slow"` を付ける（決定7）
+  - `pre_tool_fp_warning.py`: `src/domain/` 配下の編集で `docs/spec/01_requirements.md` に `TODO: FPに確認` が残っていれば警告（止めない＝exit 0・additionalContext で返す）
+  - 配線は `python3 "$CLAUDE_PROJECT_DIR"/.claude/hooks/<名前>.py`。絶対パス `/home/tmotoki/...` を残さない
+  - テスト: `tests/hooks/test_post_tool_run_tests.py`・`tests/hooks/test_pre_tool_fp_warning.py`（標準入力の JSON を与えて出力と終了コードを見る。pytest の実行そのものは差し替えて確かめる）
+- [ ] 3. **TDD 対象**: guard フックを持ち込む（tester → architect → engineer → reviewer）
+  - 3a. tester: 移植元の仕様を LES 用に写し、`docs/design/test_spec_guard_hook.md` を作る。差分は「LES で足す秘密」（`data/` 配下・`*.db`・`*.sqlite*`・`*.xlsx`・`settings.local.json`。`frontend/.env.development` は例外）と「読む動詞に `sqlite3`・`unzip` を足す」の2点だけにする。テスト中のパス例はこのリポジトリ名・`$CLAUDE_PROJECT_DIR` に置き換える。設計書・テストに移植元のリポジトリ名は書かない（決定8。「移植元のコミット」とだけ書く）
+  - 3b. architect: `docs/design/guard_hook.md`（移植元の設計を参照し、差分と移植元コミットだけ書く）
+  - 3c. engineer: `.claude/hooks/guard.py` を移植元から複製し、語彙表（定数）だけに LES の差分を足す。`tests/hooks/__init__.py`・`tests/hooks/test_guard.py`・`tests/fixtures/deny_probe/.env`（中身 `DUMMY=1`。`.gitignore` の `.env` に掛かるので除外行を足す）を作る。Red → Green
+  - 3d. `TestRepositoryIntegration` の `DENY_SAMPLES` を 1 の deny と一致させる（deny を足したらテストの表も足す）
+  - 3e. reviewer（四層レビュー）
+- [ ] 4. **配線（設定。テストは 2・3 に含む）**: `hooks.PreToolUse` に matcher `Bash` の guard、2 の2フックを差し替え。Edit ツールで行い承認で確認する。配線後は Bash で `.claude/` を書き換えられなくなる（以後の修正は Edit ツール）
+- [ ] 5. **設定のみ（運営者の作業が要る）**: `.claude/settings.local.json` の広い許可を削る。AI は中身を開かない。運営者に中身（秘密があれば伏せて）を見せてもらうか、運営者自身が `Bash(*)`・`Bash(python:*)`・`Bash(cat:*)`・`Read(//**)` のような広い許可を消す。秘密（トークン等）が入っていたら値の失効・再発行も検討
+- [ ] 6. **実機確認（Claude Code を再起動してから・人の立ち会いのもと・本物ではなくダミーで）**
+  - `cat tests/fixtures/deny_probe/.env` → guard が止める（`PreToolUse:Bash hook error`・`DUMMY` が出ない）
+  - `sqlite3 tests/fixtures/deny_probe/dummy.db .tables`・`cat tests/fixtures/deny_probe/cf_simulation_dummy.xlsx` → 止まる（ファイルは作らない。万一通っても「無い」と出るだけ）
+  - Read ツールで `tests/fixtures/deny_probe/.env` → deny で拒否される（permissions は再起動後でないと効かない）
+  - `head -3 .claude/settings.json`・`git status --short`・`.venv/bin/python -m pytest tests/hooks/ -q` → 通る
+  - `src/` 配下を1行触って戻す → pytest フックが走る／`src/domain/` で警告が出る（2 の確認）
+  - 書き換え・`rm -rf`・`git push -f` は実機で試さない（単体テストで担保）
+  - 結果は `docs/design/guard_hook.md` 末尾に記録
+- [ ] 7. 個人メモリの棚卸し: 対象なし（2026-10-18 時点で LES 用メモリは存在しない）。完了扱い
+
+### 着手順序の根拠
+
+- 1（設定）は再起動まで効かないので先に入れておくと、6 の確認を1回の再起動で済ませられる。ただし deny の対象は 0 の回答で決まる
+- 2 を 3 より先にする: 既存フックが動いていない疑いがあり、規模が小さい。標準入力の読み方・`$CLAUDE_PROJECT_DIR`・テストの置き場を先に固めると 3 の土台になる
+- 3 の後に 4（配線）: 配線するとその場で Bash の `.claude/` 書き換えが止まるので、guard とテストが reviewer を通ってから
+- 5 は運営者の作業が要るので 0 と同時に依頼し、6 の再起動前に終わらせる
+
+### guard の持ち込み方（比較と推奨）
+
+| 案 | 内容 | 評価 |
+|---|---|---|
+| **A. 複製して語彙表に LES 分を足す（推奨）** | `guard.py`・テストを LES に複製。差分は定数（秘密の判定・読む動詞）だけ | LES は独立したソフトウェア（CLAUDE.md）で公開リポジトリ。clone しただけで安全設定が揃う。guard は標準ライブラリだけの1ファイルで依存が無い。弱点は二重管理 → 移植元コミットを設計書に書き、差分を定数ブロックに閉じ込めて追従しやすくする |
+| B. ユーザー設定（`~/.claude`）に1つ置いて共通化 | 全プロジェクトに効く | リポジトリの外に出るので LES を別の場所で開くと効かない。プロジェクトごとの秘密の表を持たせるには guard が設定ファイルを読む必要があり、移植元の「ファイルを開かない」設計に反する |
+| C. 移植元を symlink・submodule で参照 | 1か所で管理 | 別リポジトリへの依存が公開リポジトリに入る。パスが変わると壊れる。`.claude/hooks/**` の保護対象がリポジトリ外を指す |
+| D. 共通部分と LES 用設定ファイルに分ける | 拡張しやすい | 2プロジェクトでは過剰。guard が設定を読む点は B と同じ問題 |
+
+推奨: **A**。定数の差分（`sqlite3`・`unzip` を読む動詞に足す等）は移植元にも害が無いので、移植元に戻すかは別途判断（移植元のバックログに書く）。
+
+### LES で止める対象（2026-10-20 確定）
+
+| 対象 | 扱い | 根拠 |
+|---|---|---|
+| `data/` 配下（実データのシナリオ・`clients.db`・出力の Excel） | 止める | 顧客データの置き場所（タスク0.5） |
+| `.env` 系（移植元と同じ） | 止める | `ANTHROPIC_API_KEY` を使う |
+| `frontend/.env.development` | 止めない（例外） | git 管理済み・公開済み（決定3） |
+| `.claude/settings.local.json` | 止める（basename で判定） | 個人の許可設定 |
+| `*.db` / `*.sqlite*` | 止める | 顧客 DB。`data/` の外に残った分と Electron の保存先も拾う |
+| `*.xlsx` | 止める | 出力は顧客の家計が入る（決定1） |
+| `scenario.yaml`（直下） | 止めない | git 管理のサンプル。実データは `data/scenarios/` |
+| `output/`（直下） | 止めない | Electron のビルド成果物だけ（名前の整理はバックログ） |
+| PDF 出力（`*.pdf`） | 止めない | ブラウザのダウンロードとして保存され、リポジトリに出力しない |
+
+既知の穴（移植元と同じ）: スクリプトファイル経由（`python tools/x.py` の中で `clients.db` を開く）・API サーバーの応答経由は止まらない。guard はコマンド文字列だけを見る。
+
+### 運営者の決定（2026-10-20）
+
+1. 出力の Excel は `*.xlsx` 全般を止める
+2. `scenario.yaml` は今後もサンプルだけ。ただし実データでも運用できるようにする → 実データは `data/scenarios/` に置く（タスク0.5）。顧客データは `data/` にまとめる（設計方針として `CLAUDE.md` コア原則と `docs/rules/00_workflow.md` に記載）
+3. `frontend/.env.development` は guard・deny の例外にする（git 管理済み・公開済み）
+4. Electron の保存先 `~/.config/…/clients.db` も Read の deny に書く
+5. `settings.local.json` は運営者が自分で開いて広い許可を消す。秘密が入っていたら失効させる
+6. allow は読むだけの git コマンドと `.venv/bin/python -m pytest:*` だけ
+7. pytest フックは残し、`-m "not slow"` を付ける
+8. 公開リポジトリの設計書・テストに移植元のリポジトリ名は書かない
+
+### 運営者に確認が必要だった点（記録。回答は上）
+
+1. `cf_simulation_*.xlsx` を止めるか。`*.xlsx` 全般まで広げるか。ルートの2ファイルは実データかサンプル出力か
+2. `scenario.yaml` は今後もサンプルだけか（実データを入れる運用なら止める＋git 管理から外す必要がある）
+3. `frontend/.env.development` を guard・deny の例外にするか（止まるままでもよいか）
+4. Electron 版の保存先（`~/.config/…/clients.db`）も Read の deny に書くか（guard は basename で止めるので Bash 側は対応済みになる）
+5. `.claude/settings.local.json` の中身の確認方法（運営者が見て広い許可を消す／伏せて AI に見せる）。秘密が入っていた場合の失効
+6. allow に入れるコマンドの範囲（移植元相当の読むだけのもの＋ `.venv/bin/python -m pytest:*` でよいか）
+7. src 編集ごとの pytest フックを残すか。残すなら `-m "not slow"`（WeasyPrint を除く）にするか
+8. 設計書・テストに移植元リポジトリ名を書いてよいか（公開リポジトリのため。書かない場合は「移植元のコミット」だけ記す）
+
+### FP確認待ち事項
+
+なし。このタスクは開発基盤（`.claude/`・`tests/hooks/`・`docs/design/`）と、顧客データの既定の置き場所（タスク0.5・`src/` の既定値2か所）だけを変更し、計算モデルに触れない。
+
+### バックログ（今回はやらない）
+
+- 直下の `output/` の中身は Electron のビルド成果物（`electron-dist`）だけで、名前から中身が分からない（Excel の出力先に見える）。`build/`・`dist/`（PyInstaller）と合わせて、ビルド成果物の置き場所を整理する（`CLAUDE.md` コア原則「構成は直感的に」）
