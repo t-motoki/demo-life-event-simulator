@@ -135,7 +135,7 @@ Claude Code が LES で動くとき、次の3つが仕組みで止まる状態�
 - **既存の2フックは今も動いていない可能性が高い**。`$CLAUDE_TOOL_INPUT_FILE_PATH` を見ているが、Claude Code はフックの入力を環境変数ではなく標準入力の JSON（`tool_input.file_path`・絶対パス）で渡す。仮に値が入っても絶対パスなので `^src/` に一致しない。→ 「パスを `$CLAUDE_PROJECT_DIR` に直す」だけでは足りず、標準入力を読むスクリプトに作り直す（TDD 対象）
 - pytest: `.venv/bin/python -m pytest`（Python 3.14.2・`pytest.ini` はマーカー `slow` の定義のみ・197件収集）。フックの `python3` は pyenv の 3.14
 - `tests/` は層ごとのパッケージ（各ディレクトリに `__init__.py`）。guard のテストは `tests/hooks/` に置く
-- `clients.db`: 開発時はルート（`LES_DB_PATH` 既定値）、Electron 版は `app.getPath('userData')/clients.db`（リポジトリの外）。`*.db`・`*.xlsx` は `.gitignore` 済み
+- `clients.db`: 開発時は `data/clients.db`（`LES_DB_PATH` の既定値。`src/data_paths.py`。タスク0.5 で既定値を直下から移した。直下に残る既存の `clients.db` は運営者が移す）、Electron 版は `app.getPath('userData')/clients.db`（リポジトリの外）。`data/`・`*.db`・`*.xlsx` は `.gitignore` 済み
 - `cf_simulation_20260407.xlsx`・`cf_simulation_20260411.xlsx` がルートにある（`scenario.yaml` から作った出力の可能性が高いが未確認）
 - `output/` の中身は Electron のビルド成果物だけ（顧客データは無い）
 - `scenario.yaml` と `frontend/.env.development` は git 管理されている（リモートは公開リポジトリ demo-life-event-simulator）
@@ -147,13 +147,16 @@ Claude Code が LES で動くとき、次の3つが仕組みで止まる状態�
 着手順は データの置き場所 → 設定 → フック → guard → 配線 → settings.local.json → 実機確認。
 
 - [x] 0. 運営者に確認する（2026-10-20 回答済み。下の「運営者の決定」）
-- [ ] 0.5. **TDD 対象**: 顧客データを `data/` にまとめる（planner → tester → architect → engineer → reviewer）
+- [x] 0.5. **TDD 対象**: 顧客データを `data/` にまとめる（2026-10-20 完了・reviewer 済み。**残り: 運営者が直下の `clients.db` と `cf_simulation_*.xlsx` を `data/` に移す**）（planner → tester → architect → engineer → reviewer）
   - 理由: 実データのシナリオの置き場を作るにあたり、顧客データが直下の `clients.db`・直下の `cf_simulation_*.xlsx`・新しいフォルダの3か所に散らばるのを避ける（`CLAUDE.md` コア原則「構成は直感的に」・`docs/rules/00_workflow.md`「配置の原則」）。`.gitignore`・deny・guard の対象を `data/` 1か所にする
-  - 変えるもの: DB の既定パス（`src/api/dependencies.py` の `LES_DB_PATH` 既定値・`src/db/sqlite_repository.py` の既定 URL）→ `data/clients.db`、Excel の既定の出力先（`src/output/excel_writer.py` の `output_dir`、`src/main.py` からの呼び出し）→ `data/output/`。出力先のフォルダが無ければ作る
+  - 変えるもの: DB の既定パス → `data/clients.db`（既定値は1か所。`src/db/sqlite_repository.py` は既定値を持たない）、Excel の既定の出力先（`src/output/excel_writer.py` の `output_dir`）→ `data/output/`。DB・出力ともフォルダが無ければ作る。`src/main.py` は変更不要。詳細は設計書
   - 変えないもの: Electron 版（`LES_DB_PATH` を `userData` で明示しているので影響なし）・計算モデル・API の応答
-  - `data/` を `.gitignore` に足す。`data/scenarios/` はフォルダだけ作る（中身は git に入れない）
+  - `data/` を `.gitignore` に足す。`data/scenarios/` はコードでは作らず、README に `mkdir -p data/scenarios` と書く（決定④）
   - README に「データの置き場所」の節を足す（実データのシナリオは `data/scenarios/` に置き `python -m src.main data/scenarios/<名前>.yaml` で実行する／サンプルは直下の `scenario.yaml`／出力は `data/output/`）
   - 既存の直下の `clients.db` と `cf_simulation_*.xlsx` 2つは**運営者が自分で `data/` に移す**（AI は中身に触れない）
+  - 振る舞い仕様（tester・2026-10-20）: `docs/design/test_spec_data_directory.md`（確認点6件は下の「運営者の決定」で回答済み・仕様に反映済み）
+  - 運営者の決定（2026-10-20・仕様の確認点）: ①相対パスは作業ディレクトリ基準のまま ②`LES_DB_PATH` を明示したときも親フォルダが無ければ作る ③DB の既定値は1か所にまとめる（`sqlite_repository.py` の既定値をなくす） ④`data/scenarios/` は README に `mkdir -p data/scenarios` と書く ⑤空 DB の警告コードは足さない。マージ前に運営者が直下の `clients.db` と Excel を `data/` に移す ⑥`docs/guides/setup-windows.md` の Excel の出力先の記述はこのタスクで直す（同じ節の `python src/main.py` はバックログ）
+  - 設計書（architect・2026-10-20）: `docs/design/data_directory.md`（既定値は新規 `src/data_paths.py` に置く提案＝決定③の置き場所の変更案）
 - [ ] 1. **設定のみ（TDD 対象外）**: `.claude/settings.json` に permissions を足す（Edit ツール・承認ダイアログで人が確認）
   - deny: 移植元と同じ `.env` 系・`*.pem`・`id_rsa*`・`~/claude-settings-backup/**` に加え、`Read(./data/**)`（顧客データ一式）・`Read(./.claude/settings.local.json)`・`Read(**/*.db)`・`Read(**/*.sqlite*)`・`Read(**/*.xlsx)`（0 の決定1）・`Read(~/.config/**/clients.db)`（Electron の保存先・決定4）。`frontend/.env.development` は例外（決定3）
   - ask: 移植元と同じ3件（`Edit(./.claude/settings.json)`・`Edit(./.claude/settings.local.json)`・`Edit(./.claude/hooks/**)`）
@@ -244,4 +247,8 @@ Claude Code が LES で動くとき、次の3つが仕組みで止まる状態�
 
 ### バックログ（今回はやらない）
 
+- `docs/diagrams/system.mmd` の excel_writer のノードが「2シート構成」のまま（今は3シート）
+- `docs/guides/setup-windows.md` の `python src/main.py`（`-m` も引数も無い）は今の実装で動かない。手順を直す。同じ手引きの「4.」は `pip install openpyxl` だけで、CLI に要る PyYAML が入らない（`pip install -r requirements.txt` にするか、要るものだけにするかを決める）。`mkdir -p data/scenarios` に当たる Windows の手順（`mkdir data\scenarios`）も無い
+- README の「ステータス」（要件定義完了 / 実装前）・「使い方」（実装後に追記）が今の実装と合っていない。「データの置き場所」の節と重ならないように書き直す（タスク0.5 の reviewer・2026-10-20）
+- `LES_DB_PATH=""`（空文字）だとメモリ DB になり、再起動で保存したクライアントが消える（タスク0.5 の仕様 A6。今回は挙動を変えていない）。空文字をエラーにするか既定値扱いにするかを決める
 - 直下の `output/` の中身は Electron のビルド成果物（`electron-dist`）だけで、名前から中身が分からない（Excel の出力先に見える）。`build/`・`dist/`（PyInstaller）と合わせて、ビルド成果物の置き場所を整理する（`CLAUDE.md` コア原則「構成は直感的に」）
