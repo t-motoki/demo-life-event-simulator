@@ -1,7 +1,7 @@
 # 作業ワークフロー
 
 作成日: 2026-04-05
-最終更新: 2026-04-05
+最終更新: 2026-10-24
 
 ---
 
@@ -103,11 +103,14 @@ tests/
   output/
   api/
   db/
+  hooks/         ← .claude/hooks/ のフックのテスト（tests/ が src/ を写す原則の例外）
   test_main.py   ← CLI（src/main.py）のテスト
 docs/
   rules/         ← ワークフロー・共通ルール（このファイル）
   spec/          ← FPと合意した仕様・要件
   guides/        ← 非エンジニア向けの操作手引き
+.claude/
+  hooks/         ← Claude Code のフック（1フック = 標準ライブラリだけで動く1ファイル）
 tasks/
   todo.md        ← 現在のタスク・FP確認待ち事項
   lessons.md     ← 過去の学びと教訓

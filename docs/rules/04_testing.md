@@ -20,10 +20,13 @@ tests/
   output/     test_<モジュール名>.py   例: test_excel_writer.py
   api/        test_<モジュール名>.py   例: test_dependencies.py
   db/         test_<モジュール名>.py   例: test_sqlite_repository.py
+  hooks/      test_<フック名>.py       例: test_post_tool_run_tests.py（.claude/hooks/ のテスト）
   test_main.py                         src/main.py（CLI）のテスト
 ```
 
 `tests/` は `src/` の構成を写す。`src/` 直下のファイルのテストは `tests/` 直下に置く。
+
+例外: `tests/hooks/` は `src/` ではなく `.claude/hooks/`（Claude Code のフック）のテストを置く。フックはパッケージではない1ファイル完結のスクリプトなので、テストは import ではなくファイルの場所から読み込む（`tests/hooks/conftest.py`）。
 
 ---
 
