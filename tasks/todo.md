@@ -157,12 +157,12 @@ Claude Code が LES で動くとき、次の3つが仕組みで止まる状態�
   - 振る舞い仕様（tester・2026-10-20）: `docs/design/test_spec_data_directory.md`（確認点6件は下の「運営者の決定」で回答済み・仕様に反映済み）
   - 運営者の決定（2026-10-20・仕様の確認点）: ①相対パスは作業ディレクトリ基準のまま ②`LES_DB_PATH` を明示したときも親フォルダが無ければ作る ③DB の既定値は1か所にまとめる（`sqlite_repository.py` の既定値をなくす） ④`data/scenarios/` は README に `mkdir -p data/scenarios` と書く ⑤空 DB の警告コードは足さない。マージ前に運営者が直下の `clients.db` と Excel を `data/` に移す ⑥`docs/guides/setup-windows.md` の Excel の出力先の記述はこのタスクで直す（同じ節の `python src/main.py` はバックログ）
   - 設計書（architect・2026-10-20）: `docs/design/data_directory.md`（既定値は新規 `src/data_paths.py` に置く提案＝決定③の置き場所の変更案）
-- [ ] 1. **設定のみ（TDD 対象外）**: `.claude/settings.json` に permissions を足す（Edit ツール・承認ダイアログで人が確認）
+- [x] 1. **設定のみ（TDD 対象外）**: `.claude/settings.json` に permissions を足す（Edit ツール・承認ダイアログで人が確認）（2026-10-20 完了。移植元の `Read(**/.env.development*)` は入れない＝deny は例外を書けず決定3の `frontend/.env.development` まで止まるため。`.env.development.local` は `.env.*.local` で止まる）
   - deny: 移植元と同じ `.env` 系・`*.pem`・`id_rsa*`・`~/claude-settings-backup/**` に加え、`Read(./data/**)`（顧客データ一式）・`Read(./.claude/settings.local.json)`・`Read(**/*.db)`・`Read(**/*.sqlite*)`・`Read(**/*.xlsx)`（0 の決定1）・`Read(~/.config/**/clients.db)`（Electron の保存先・決定4）。`frontend/.env.development` は例外（決定3）
   - ask: 移植元と同じ3件（`Edit(./.claude/settings.json)`・`Edit(./.claude/settings.local.json)`・`Edit(./.claude/hooks/**)`）
   - allow: 読むだけのコマンドに絞る（`git status/diff/log/show`・`.venv/bin/python -m pytest:*`）（決定6）
   - 再起動するまで効かない。確認は 6 でまとめて行う
-- [ ] 2. **TDD 対象**: 既存2フックを `.claude/hooks/` のスクリプトに作り直す（tester → architect → engineer → reviewer）
+- [x] 2. **TDD 対象**: 既存2フックを `.claude/hooks/` のスクリプトに作り直す（tester → architect → engineer → reviewer）（2026-10-24 完了・reviewer 四層○。仕様 `docs/design/test_spec_edit_hooks.md`・設計 `docs/design/edit_hooks.md`。tests/hooks 135件・全体 345 passed。配線はタスク4）
   - `post_tool_run_tests.py`: 標準入力の `tool_input.file_path` が `$CLAUDE_PROJECT_DIR/src/` 配下なら `"$CLAUDE_PROJECT_DIR"/.venv/bin/python -m pytest tests/ -q --tb=short` を実行（現状は `python`＝venv 外を使っている）。`-m "not slow"` を付ける（決定7）
   - `pre_tool_fp_warning.py`: `src/domain/` 配下の編集で `docs/spec/01_requirements.md` に `TODO: FPに確認` が残っていれば警告（止めない＝exit 0・additionalContext で返す）
   - 配線は `python3 "$CLAUDE_PROJECT_DIR"/.claude/hooks/<名前>.py`。絶対パス `/home/tmotoki/...` を残さない
@@ -252,3 +252,4 @@ Claude Code が LES で動くとき、次の3つが仕組みで止まる状態�
 - README の「ステータス」（要件定義完了 / 実装前）・「使い方」（実装後に追記）が今の実装と合っていない。「データの置き場所」の節と重ならないように書き直す（タスク0.5 の reviewer・2026-10-20）
 - `LES_DB_PATH=""`（空文字）だとメモリ DB になり、再起動で保存したクライアントが消える（タスク0.5 の仕様 A6。今回は挙動を変えていない）。空文字をエラーにするか既定値扱いにするかを決める
 - 直下の `output/` の中身は Electron のビルド成果物（`electron-dist`）だけで、名前から中身が分からない（Excel の出力先に見える）。`build/`・`dist/`（PyInstaller）と合わせて、ビルド成果物の置き場所を整理する（`CLAUDE.md` コア原則「構成は直感的に」）
+- FP 未確認の警告フック（`.claude/hooks/pre_tool_fp_warning.py`・タスク2）は要件定義書の `TODO: FPに確認` だけを見るが、要件定義書には今マーカーが0件で発火しない（FP 未確定事項は § 8 の表、マーカーは `src/domain/education.py` などのコード側）。判定の対象を `src/` のコードの `TODO: FPに確認`（`/fp-check` の手順1と同じ情報源）に変えるかを決める。`src/` 全体を読むので要件定義書1つより重くなる点も含めて判断する（`docs/design/test_spec_edit_hooks.md`「運営者の決定」1・2026-10-22）
