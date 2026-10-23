@@ -1,4 +1,36 @@
 {
+  "permissions": {
+    "allow": [
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git show:*)",
+      "Bash(.venv/bin/python -m pytest:*)"
+    ],
+    "ask": [
+      "Edit(./.claude/settings.json)",
+      "Edit(./.claude/settings.local.json)",
+      "Edit(./.claude/hooks/**)"
+    ],
+    "deny": [
+      "Read(./.env)",
+      "Read(**/.env)",
+      "Read(**/.env.local)",
+      "Read(**/.env.*.local)",
+      "Read(**/.env.production*)",
+      "Read(**/.env.staging*)",
+      "Read(**/.env.test*)",
+      "Read(**/*.pem)",
+      "Read(**/id_rsa*)",
+      "Read(~/claude-settings-backup/**)",
+      "Read(./data/**)",
+      "Read(./.claude/settings.local.json)",
+      "Read(**/*.db)",
+      "Read(**/*.sqlite*)",
+      "Read(**/*.xlsx)",
+      "Read(~/.config/**/clients.db)"
+    ]
+  },
   "hooks": {
     "PostToolUse": [
       {
