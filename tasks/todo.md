@@ -139,7 +139,7 @@ Claude Code が LES で動くとき、次の3つが仕組みで止まる状態�
 - `cf_simulation_20260407.xlsx`・`cf_simulation_20260411.xlsx` がルートにある（`scenario.yaml` から作った出力の可能性が高いが未確認）
 - `output/` の中身は Electron のビルド成果物だけ（顧客データは無い）
 - `scenario.yaml` と `frontend/.env.development` は git 管理されている（リモートは公開リポジトリ demo-life-event-simulator）
-- LES 用の個人メモリ（`~/.claude/projects/-home-tmotoki-pjt-life-event-simulator/memory/`）は**存在しない**。棚卸しは不要
+- LES 用の個人メモリ（`~/.claude/projects/-home-<ユーザー>-pjt-life-event-simulator/memory/`）は**存在しない**。棚卸しは不要
 - `.claude/settings.local.json`（348B・git 管理外）は中身を誰も開いていない
 
 ### タスク一覧
@@ -165,9 +165,9 @@ Claude Code が LES で動くとき、次の3つが仕組みで止まる状態�
 - [x] 2. **TDD 対象**: 既存2フックを `.claude/hooks/` のスクリプトに作り直す（tester → architect → engineer → reviewer）（2026-10-24 完了・reviewer 四層○。仕様 `docs/design/test_spec_edit_hooks.md`・設計 `docs/design/edit_hooks.md`。tests/hooks 135件・全体 345 passed。配線はタスク4）
   - `post_tool_run_tests.py`: 標準入力の `tool_input.file_path` が `$CLAUDE_PROJECT_DIR/src/` 配下なら `"$CLAUDE_PROJECT_DIR"/.venv/bin/python -m pytest tests/ -q --tb=short` を実行（現状は `python`＝venv 外を使っている）。`-m "not slow"` を付ける（決定7）
   - `pre_tool_fp_warning.py`: `src/domain/` 配下の編集で `docs/spec/01_requirements.md` に `TODO: FPに確認` が残っていれば警告（止めない＝exit 0・additionalContext で返す）
-  - 配線は `python3 "$CLAUDE_PROJECT_DIR"/.claude/hooks/<名前>.py`。絶対パス `/home/tmotoki/...` を残さない
+  - 配線は `python3 "$CLAUDE_PROJECT_DIR"/.claude/hooks/<名前>.py`。絶対パス `/home/<ユーザー>/...` を残さない
   - テスト: `tests/hooks/test_post_tool_run_tests.py`・`tests/hooks/test_pre_tool_fp_warning.py`（標準入力の JSON を与えて出力と終了コードを見る。pytest の実行そのものは差し替えて確かめる）
-- [ ] 3. **TDD 対象**: guard フックを持ち込む（tester → architect → engineer → reviewer）
+- [x] 3. **TDD 対象**: guard フックを持ち込む（tester → architect → engineer → reviewer）
   - 3a. tester: 移植元の仕様を LES 用に写し、`docs/design/test_spec_guard_hook.md` を作る。差分は「LES で足す秘密」（`data/` 配下・`*.db`・`*.sqlite*`・`*.xlsx`・`settings.local.json`。`frontend/.env.development` は例外）と「読む動詞に `sqlite3`・`unzip` を足す」の2点だけにする。テスト中のパス例はこのリポジトリ名・`$CLAUDE_PROJECT_DIR` に置き換える。設計書・テストに移植元のリポジトリ名は書かない（決定8。「移植元のコミット」とだけ書く）
     - 2026-10-29 完了: `docs/design/test_spec_guard_hook.md`（移植元コミット `d20ea9a` の誤検知の修正まで含めて写した。LES の差分は10節、運営者の決定9点は11節）
   - 3b. architect: `docs/design/guard_hook.md`（移植元の設計を参照し、差分と移植元コミットだけ書く）
@@ -179,6 +179,7 @@ Claude Code が LES で動くとき、次の3つが仕組みで止まる状態�
     - 3c-4: 性能テスト2件に `slow` を付け、`pytest.ini` の説明・README の1文（ファイル名に顧客の名前を使わない）・`docs/rules/00_workflow.md` の構成図（`tests/fixtures/`）を直す
   - 3d. `DENY_SAMPLES` を deny の16件にし、`test_every_read_deny_is_covered` に `project_dir` を渡す。`test_deny_exception_is_also_allowed_by_guard` を足す。`test_settings_wires_guard` は持ち込まない（タスク4）
   - 3e. reviewer（四層レビュー）。あわせて、移植元の `d20ea9a` と `diff` を取り差分が【LES】の印と【LES】ブロックに閉じていること（テストも同じ）、公開リポジトリに出せない語の grep が0件であることを確かめる
+  - 2026-11-01 完了（3c〜3e）: reviewer 四層○。3e で見つかった `..` を挟んだ `data/` は決定11で塞いだ（再レビュー○）。H2〜H4・ヒアドキュメントの Python・here-string の xargs は記録だけ（仕様8節【LES】・決定12）。tests/hooks 1228 passed・2 xfailed、全体 1439 passed・2 skipped・2 xfailed。guard は配線前なのでまだ何も止めない（タスク4）
 - [ ] 4. **配線（設定。テストは 2・3 に含む）**: `hooks.PreToolUse` に matcher `Bash` の guard（`"timeout": 10` 付き）、2 の2フックを差し替え。`test_settings_wires_guard` と G1〜G4 もこの工程で書く。Edit ツールで行い承認で確認する。配線後は Bash で `.claude/` を書き換えられなくなる（以後の修正は Edit ツール）
 - [ ] 5. **設定のみ（運営者の作業が要る）**: `.claude/settings.local.json` の広い許可を削る。AI は中身を開かない。運営者に中身（秘密があれば伏せて）を見せてもらうか、運営者自身が `Bash(*)`・`Bash(python:*)`・`Bash(cat:*)`・`Read(//**)` のような広い許可を消す。秘密（トークン等）が入っていたら値の失効・再発行も検討
 - [ ] 6. **実機確認（Claude Code を再起動してから・人の立ち会いのもと・本物ではなくダミーで）**

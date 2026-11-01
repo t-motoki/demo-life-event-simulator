@@ -1,7 +1,7 @@
 # 作業ワークフロー
 
 作成日: 2026-04-05
-最終更新: 2026-10-24
+最終更新: 2026-11-01
 
 ---
 
@@ -104,6 +104,7 @@ tests/
   api/
   db/
   hooks/         ← .claude/hooks/ のフックのテスト（tests/ が src/ を写す原則の例外）
+  fixtures/      ← テストが使うダミーのファイル（deny_probe/.env: guard・deny の実機確認用）
   test_main.py   ← CLI（src/main.py）のテスト
 docs/
   rules/         ← ワークフロー・共通ルール（このファイル）

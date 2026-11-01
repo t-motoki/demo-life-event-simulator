@@ -1,7 +1,7 @@
 # テスト仕様: シェル経由の危険操作を止める PreToolUse フック（guard）
 
 作成日: 2026-10-28（tester）
-最終更新: 2026-10-29（11節の9点を運営者の決定として反映。すべて tester の推奨どおり）
+最終更新: 2026-11-01（3e レビュー後の運営者の決定を反映: 途中に `..` を挟んだ `data/` を止める＝11節 決定11、既知の穴の記録＝決定12、9.4.1 の並びの形の数と 10.2 の表の追記）。2026-10-29: 11節の9点を運営者の決定として反映
 対象タスク: `tasks/todo.md`「実装計画: 開発基盤の安全設定」タスク3（3a）
 移植元: 別リポジトリで導入済みの guard フック。**移植元のコミット `d20ea9a`** の仕様を写す（`tasks/todo.md` が前提にした `57cb314`・`b421b54` の後に入った誤検知の修正＝9節を含む）
 次工程: architect（3b `docs/design/guard_hook.md`）→ engineer（3c・3d）→ reviewer（3e）
@@ -81,7 +81,7 @@ def main(stdin=None, stderr=None, environ=None) -> int:
 パス判定は、トークンから次を取り除いた形で行う:
 - 先頭の `@`（`curl -d @.env`）、`名前=` / `名前=@`（`if=.env`・`file=@.env`・`--env-file=.env`）
 - `./`・`../` の繰り返し、`~/…`・`$HOME/…`・`${HOME}/…`・`$CLAUDE_PROJECT_DIR/…`・`${CLAUDE_PROJECT_DIR}/…`・絶対パスの前置部分（判定は**パスの末尾側の構成要素**で行うので、前置部分の違いは結果に影響しない）
-- 【LES】例外: 「顧客データの置き場所」（3.3 の `data/`）だけは**パスの先頭側**で判定する（プロジェクト直下の `data/` だけを指すため。`.gitignore` の `/data/` と同じ考え方）。前置部分の扱いは 3.3 の表に書く
+- 【LES】例外: 「顧客データの置き場所」（3.3 の `data/`）だけは**パスの先頭側**で判定する（プロジェクト直下の `data/` だけを指すため。`.gitignore` の `/data/` と同じ考え方）。前置部分の扱いは 3.3 の表に書く。先頭側で見るので、**途中の `..` を解いた形でも見る**（`src/../data/x` は `data/x`。3.3・10.1 L5・11節 決定11）
 
 ### 3.3 カテゴリA: 秘密ファイルを読む
 **秘密パス**（basename または構成要素で判定。**大文字小文字を区別しない**: WSL の `/mnt/c` など区別しないファイルシステムでは `cat .ENV` でも `.env` が読めるため）:
@@ -94,7 +94,7 @@ def main(stdin=None, stderr=None, environ=None) -> int:
 | 退避 | 構成要素に `claude-settings-backup` を含む | — |
 | 【LES】顧客 DB | basename が `*.db`（`.db` で終わる）・`*.sqlite*`（`.sqlite` を含む）。任意の階層・前置部分を問わない（`/tmp/…`・`~/.config/…`（Electron の保存先）も） | `src/db/sqlite_repository.py`・`tests/db/`（構成要素 `db`・`sqlite_…` は `.db`・`.sqlite` ではない）・`sqlite3`（コマンド名） |
 | 【LES】出力の Excel | basename が `*.xlsx`（`.xlsx` で終わる）。任意の階層 | `xlsx_notes.md` |
-| 【LES】顧客データの置き場所 | 次のどれか（**プロジェクト直下の `data/` とその下すべて**。`data` そのものも含む）: ①相対パスで、`.`・`..` を除いた最初の構成要素が `data`（`data`・`data/`・`./data/x`・`../data/x`）②`$CLAUDE_PROJECT_DIR`・`${CLAUDE_PROJECT_DIR}` の直後の構成要素が `data` ③`project_dir` が与えられたとき、プロジェクトのフォルダ名（`project_dir` の basename）の構成要素の直後が `data`（`/work/proj/data/x`・`~/pjt/proj/data/x`・`../proj/data/x`） | `tests/data/x`・`frontend/src/data/x`・`/tmp/x/data/y`・`/work/other/data/y`・`data_paths.py`・`data.json`・`metadata/x`・`docs/design/data_directory.md` |
+| 【LES】顧客データの置き場所 | 次のどれか（**プロジェクト直下の `data/` とその下すべて**。`data` そのものも含む）: ①相対パスで、`.`・`..` を除いた最初の構成要素が `data`（`data`・`data/`・`./data/x`・`../data/x`）②`$CLAUDE_PROJECT_DIR`・`${CLAUDE_PROJECT_DIR}` の直後の構成要素が `data` ③`project_dir` が与えられたとき、プロジェクトのフォルダ名（`project_dir` の basename）の構成要素の直後が `data`（`/work/proj/data/x`・`~/pjt/proj/data/x`・`../proj/data/x`）。**①〜③は「書いたままの形」と「`..` を解いた形」の2つに掛け、どちらかに当たれば秘密**（止める側にだけ倒す。11節 決定11）。「`..` を解いた形」は、前置部分（先頭の `/`・`~`・`$HOME`・`${HOME}`・`$CLAUDE_PROJECT_DIR`・`${CLAUDE_PROJECT_DIR}`）を残し、その後ろの `.` を捨て、`名前/..` を打ち消した形。前置部分より前には戻らず、相対パスの先頭に余った `..` は残す（①の「`.`・`..` を除いた最初」がそのまま掛かる）（`src/../data/x`→`data/x`・`$CLAUDE_PROJECT_DIR/src/../data/x`→`$CLAUDE_PROJECT_DIR/data/x`・`/work/proj/src/../data/x`→`/work/proj/data/x`・`src/../../data/x`→`../data/x`） | `tests/data/x`・`frontend/src/data/x`・`/tmp/x/data/y`・`/work/other/data/y`・`data_paths.py`・`data.json`・`metadata/x`・`docs/design/data_directory.md`・【11節 決定11】`data_x/../src/a.py`・`tests/../src/data_paths.py`・`src/../tests/data/x`・`/work/other/src/../data/y`（どちらの形でも当たらない） |
 | glob | ドットで始まる basename の glob が `.env` に一致しうる（`.e*`・`.env*`・`.*`・`.en?`）／basename が `*.pem`・`id_rsa*` に一致。【LES】basename にリテラルの `.` があり、その `.` より後ろの glob が秘密の拡張子（`db`・`xlsx`・`sqlite…`）に一致しうる（`*.db`・`*.xls?`・`clients.d?`・`*.*`・`*.s*`） | `*`（bash はドットファイルを展開しない。【LES】顧客ファイルには一致しうるが通す＝8節）・`*.py`・【LES】`cf_*`（`.` が無い＝8節） |
 
 【LES】**インタプリタのインラインコード（A3）では、「顧客データの置き場所」は `/` を含む語（`data/…`）だけを数える**。`data` だけの語は数えない（Python の変数名 `data` で止めないため。10.1 L5）。他の秘密（`.db`・`.xlsx` など）は A1 と同じに数える。
@@ -342,9 +342,10 @@ def main(stdin=None, stderr=None, environ=None) -> int:
 20. 【LES】**顧客 DB・Excel の glob は「拡張子の側」で判定する**。`*.db`・`clients.d?`・`*.xls?`・`*.*` は止め、`*`・`cf_*` は通す。`*` まで止めると `cat *`・`grep x src/*` のような日常の形がすべて止まる。`*` は直下に顧客ファイルがあるときだけ危ないが、直下の `clients.db`・`cf_simulation_*.xlsx` は運営者が `data/` に移す（タスク0.5）ので、移した後は直下の `*` に顧客ファイルは当たらない
 21. 【LES】**`sqlite3`・`unzip` は動詞として足すだけで、オプションを読み分けない**。`unzip -l x.xlsx`（名前の一覧だけ）・`unzip x.zip -x '*.db'`（除外の指定）も止まる（誤検知の側）。`--exclude` の値を割り引くコマンド（9.3）・一覧だけの許可リスト（9.4）に `sqlite3`・`unzip` を**足さない**（足すと 9.3・9.4 の「通すことで増える経路が無いことの確認」をやり直す必要がある。差分を2点に保つ）
 22. 【LES】**カテゴリ名・理由文は移植元のまま**（3.6）。顧客データでも「秘密ファイルの読み取り」と出す。AI が取るべき行動（回避せず人に判断を求める）は同じで、文言を分けても行動は変わらないため
+23. 【LES】**`..` を挟んだ `data/` は、書いたままの形と `..` を解いた形の両方で見る**（11節 決定11）。解いた形だけに置き換えない: 置き換えると、今止まっている `cat data/../src/a.py`（書いたままの最初の構成要素が `data`）・`cat /work/proj/../data/x`（書いたままの形で `proj` の直後が `data`）が通るようになり、止める側にだけ倒すという決定から外れる。**`..` でプロジェクトの外に出る形は止める**: `cat ../data/x`・`cat src/../../data/x`（相対パスの先頭に余る `..`）は、Bash の cwd がプロジェクトのどの階層か文字列から分からず（`cd src && cat ../data/x` はプロジェクト直下の `data/` を読む）、`cat $CLAUDE_PROJECT_DIR/../data/x`・`cat /work/proj/../data/x` は書いたままの形でプロジェクトの直後に `data` が並ぶ。どれも外の `data/` を読むこともあるが、止まっても書き直す手間だけで済み、通すと顧客データが出うるので止める側に置く。解いた形は前置部分（`~`・`$CLAUDE_PROJECT_DIR` など）より前に戻さない: `~/../data/x` を `data/x` と読むと、`~` の親の `data/` を「プロジェクト直下」と取り違えるため（どちらに転んでも顧客データは出ないので、テストでは固定しない）。シンボリックリンクは解かない（bash の `cat` は `src/..` を実際のリンク先の親として読むが、guard はファイルシステムを見ない。リンク経由の取り違えは止める側の誤差か、8節の既存の穴に入る）
 
 ## 8. 守備範囲外（止めない・既知の穴）
-fail-open と「善意のうっかり」前提の割り切り。ここに書いたものは**テストで「通る」ことを固定しない**（将来塞いでも既存テストが壊れないように）。例外として、運営者が「誤検知として受け入れる」と決めた形は止める側のテストに置いたものがある（9.5・9.10）。
+fail-open と「善意のうっかり」前提の割り切り。ここに書いたものは**テストで「通る」ことを固定しない**（将来塞いでも既存テストが壊れないように）。例外として、運営者が「誤検知として受け入れる」と決めた形は止める側のテストに置いたものがある（9.5・9.10・【LES】11節 決定11）。
 
 **移植元から引き継ぐもの**:
 - 読み取り動詞リストに無いコマンドでの読み取り（`python3 scripts/x.py .env` のような引数渡し、`awk` の別名など未知のツール）
@@ -396,6 +397,13 @@ fail-open と「善意のうっかり」前提の割り切り。ここに書い�
 - 止まりすぎ: CLI・スクリプトの出力をフィルタに通す形（`.venv/bin/python -m src.main data/scenarios/a.yaml | tail -3`）。コマンド全体で「動詞＋秘密名」を見るため（7節-2）
 - 止まりすぎ: find の探し始める場所が `data`（`find data -name '*.yaml' | sort`）。9.4 で割り引くのは名前条件の値だけ（cd の引数と同じく、場所は数える）。`find data -type f`（フィルタ無し）は通る
 - 止まりすぎ: `unzip -l x.xlsx`・`unzip x.zip -x '*.db'`（7節-21）
+- 穴（11節 決定12。2026-11-01 の 3e レビューで見つかったもの。記録だけ）:
+  - H2: SQL 文字列の中で開く DB（`sqlite3 :memory: "ATTACH 'data/clients.db' AS c; …"`・`sqlite3 :memory: ".open 'data/clients.db'"`）。sqlite3 の引数の文字列の中の語はパスとして数えない（A1 はトークン単位、A3 はインタプリタの `-c`／`-e` だけ）。移植元の awk のプログラム（`awk 'BEGIN{while((getline l < ".env")>0) print l}'`）の穴と同じ種類で、プログラム・SQL の文字列の中身を読み分けない作りから来る
+  - H3: ブレース展開（`cat *.{db,xlsx}`・`cat clients.{db,txt}`）。guard はブレースを展開せず、basename `*.{db,xlsx}`・`clients.{db,txt}` はどの秘密の規則にも当たらない。移植元にもある穴（`cat .{env,x}` など）で、移植元で直すときに LES の語彙（L1〜L4）の分も一緒に直す
+  - H4: 3.2 の前置部分の表に無い変数で始まるパス（`cat $PWD/data/x`・`cat ${CLAUDE_PROJECT_DIR:-.}/data/x`）。①は相対パスだけ、②は `$CLAUDE_PROJECT_DIR`・`${CLAUDE_PROJECT_DIR}` そのものだけを見るので、`$PWD` と、既定値つきの展開 `${…:-…}` は当たらない
+  - ヒアドキュメントで渡す Python（`python3 - <<'EOF' … sqlite3.connect('data/clients.db') … EOF`）: 移植元 7節-6 で受け入れた穴（ヒアドキュメントの本文は判定しない）。**LES では漏れるものが `.env` から顧客データ（DB・Excel・シナリオ）に広がる**
+  - here-string で xargs に渡すパス（`xargs cat <<< .env`・`xargs cat <<< src/../data/x`）: A1 は `<<<` の右側をヒアドキュメントと同じく判定から外すが、xargs はその中身を引数にして `cat` を走らせる。移植元にもある穴（2026-11-01 の決定11のレビューで発見・運営者決定で記録だけ。直すなら移植元と同時に）
+- 止まりすぎ（11節 決定11の代償。テストでは 10.2 で止める側に固定したもの以外は固定しない）: 書いたままの形で `data` が先に出る `cat data/../src/a.py`（止める側に固定）、プロジェクトの外の `data/` を `..` で指す `cat ../data/x`・`cat /work/proj/../data/x`（止める側に固定。7節-23）
 
 ## 実装者へのノート
 - パラメータ化の `ids=` にコマンド文字列をそのまま使うと改行・記号で読みにくいので、短い id を付ける
@@ -535,15 +543,15 @@ cd /work/proj && find . -path ./node_modules -prune -o -path ./frontend/node_mod
 - 複合コマンドの形（下の「複合コマンドの並び」）は止まり続ける（回帰防止）
 
 **形の並び（テストで共有する。`BODY` を差し替えて使う）**:
-- **関数定義・coproc の並び（4形）**: `function f { BODY; }`・`function f { function g { BODY; }; }`・`coproc BODY`・`coproc NAME { BODY; }`
+- **関数定義・coproc の並び（移植元の7形）**: `function f { BODY; }`・`function f { function g { BODY; }; }`・`coproc BODY`・`coproc NAME { BODY; }`・`coproc NAME if BODY; then :; fi`・`coproc NAME while BODY; do :; done`・`coproc NAME until BODY; do :; done`（後ろ3つは上の規則の「`coproc NAME` の後ろが `{` 以外の複合コマンド」の形。2026-11-01 に移植元のテストの並びに合わせて形の数を直した）
 - **複合コマンドの並び（27形）**: `{ BODY; }`・`{ { BODY; }; }`・`! { BODY; }`・`if true; then { BODY; }; fi`・`( BODY )`・`f() ( BODY )`・`if true; then BODY; fi`・`if BODY; then :; fi`・`if false; then :; elif true; then BODY; fi`・`if false; then :; else BODY; fi`・`while true; do BODY; done`・`until false; do BODY; done`・`for f in x; do BODY; done`・`for ((i=0;i<1;i++)); do BODY; done`・`select f in x; do BODY; done`・`case x in x) BODY;; esac`・`case x in (x) BODY;; esac`・`! BODY`・`time BODY`・`time -p BODY`・`x=1 BODY`・`[[ -n x ]] && BODY`・`f() { BODY; }`・`f () { BODY; }`・`function f() { BODY; }`・`function f ( ) { BODY; }`・`coproc NAME ( BODY )`
 - 本体（BODY）: A `cat .env`／B `rm .claude/hooks/guard.py`／C `git push --force`（【LES】A に `sqlite3 data/clients.db .tables` を足すかは 10.2 の `test_function_and_coproc_bodies_customer_data_then_blocked` で別に持つ。ここは移植元のまま）
 
 | テストクラス.メソッド | 条件（command） | 期待値 | 分類 |
 | --- | --- | --- | --- |
-| `TestSecretRead.test_function_and_coproc_bodies_then_blocked` | 関数定義・coproc の並び（4形）× BODY=`cat .env` | 止 | すり抜け |
-| `TestProtectedWrite.test_function_and_coproc_bodies_then_blocked` | 同（4形）× BODY=`rm .claude/hooks/guard.py` | 止 | すり抜け |
-| `TestIrreversibleOps.test_function_and_coproc_bodies_then_blocked` | 同（4形）× BODY=`git push --force` | 止 | すり抜け |
+| `TestSecretRead.test_function_and_coproc_bodies_then_blocked` | 関数定義・coproc の並び（7形）× BODY=`cat .env` | 止 | すり抜け |
+| `TestProtectedWrite.test_function_and_coproc_bodies_then_blocked` | 同（7形）× BODY=`rm .claude/hooks/guard.py` | 止 | すり抜け |
+| `TestIrreversibleOps.test_function_and_coproc_bodies_then_blocked` | 同（7形）× BODY=`git push --force` | 止 | すり抜け |
 | `TestSecretRead.test_compound_command_bodies_then_blocked` | 複合コマンドの並び（27形）× BODY=`cat .env` | 止 | 回帰防止 |
 | `TestProtectedWrite.test_compound_command_bodies_then_blocked` | 同（27形）× BODY=`rm .claude/hooks/guard.py` | 止 | 回帰防止 |
 | `TestIrreversibleOps.test_compound_command_bodies_then_blocked` | 同（27形）× BODY=`git push --force` | 止 | 回帰防止 |
@@ -681,12 +689,13 @@ cd /work/proj && find . -path ./node_modules -prune -o -path ./frontend/node_mod
 | L2 | basename が `.sqlite` を含む | `cat x.sqlite`・`cat x.sqlite3`・`cat x.sqlite-journal` | `cat tests/db/test_sqlite_repository.py` |
 | L3 | basename が `.xlsx` で終わる | `cat cf_simulation_20260407.xlsx`・`cat data/output/x.xlsx`・`cat Book.XLSX` | — |
 | L4 | glob: basename にリテラルの `.` があり、その後ろの glob が `db`・`xlsx`・`sqlite…` に一致しうる | `cat *.db`・`cat *.xlsx`・`cat *.xls?`・`cat clients.d?`・`cat *.*`・`cat *.sqlite*` | `cat *`・`cat *.py`・`cat *.yaml`・`cat cf_*` |
-| L5 | 顧客データの置き場所（プロジェクト直下の `data/`）。①相対パスの最初の構成要素（`.`・`..` を除く）が `data` ②`$CLAUDE_PROJECT_DIR`・`${CLAUDE_PROJECT_DIR}` の直後が `data` ③`project_dir` があるとき、プロジェクトのフォルダ名の直後が `data`。大文字小文字を区別しない。**A3（インラインコード）では `/` を含む語だけ** | `cat data/scenarios/a.yaml`・`grep -r KEY data`・`cd data && cat scenarios/a.yaml`・`cat /work/proj/data/a.yaml` | `cat tests/data/x.json`・`cat /tmp/x/data/a.yaml`・`cat src/data_paths.py`・`python3 -c "data = 1; print(data)"` |
+| L5 | 顧客データの置き場所（プロジェクト直下の `data/`）。①相対パスの最初の構成要素（`.`・`..` を除く）が `data` ②`$CLAUDE_PROJECT_DIR`・`${CLAUDE_PROJECT_DIR}` の直後が `data` ③`project_dir` があるとき、プロジェクトのフォルダ名の直後が `data`。大文字小文字を区別しない。**A3（インラインコード）では `/` を含む語だけ**。**①〜③を書いたままの形と `..` を解いた形（3.3）の両方に掛け、どちらかに当たれば止める**（11節 決定11） | `cat data/scenarios/a.yaml`・`grep -r KEY data`・`cd data && cat scenarios/a.yaml`・`cat /work/proj/data/a.yaml`・`cat src/../data/scenarios/a.yaml`・`cat $CLAUDE_PROJECT_DIR/src/../data/x`・`cat /work/proj/src/../data/x`・`cat ../data/x` | `cat tests/data/x.json`・`cat /tmp/x/data/a.yaml`・`cat src/data_paths.py`・`python3 -c "data = 1; print(data)"`・`cat data_x/../src/a.py`・`cat tests/../src/data_paths.py`・`cat src/../tests/data/x.json` |
 | L6 | basename がちょうど `.env.development` なら秘密でない | — | `cat frontend/.env.development` |
 | L6' | `.env.development` 以外の `.env.development…` は従来どおり秘密 | `cat frontend/.env.development.local`・`cat frontend/.env.development.bak`・`cat frontend/.env.d*` | — |
 | V | 読み取り動詞に `sqlite3`・`unzip` | `sqlite3 data/clients.db .tables`・`unzip -p data/output/x.xlsx xl/sharedStrings.xml` | `sqlite3 --version`・`unzip -o release.zip -d build/` |
 
 - `.claude/settings.local.json` は移植元で既に秘密（3.3「ローカル設定」）。guard の変更は無い
+- **L5 と `..`（11節 決定11）**: 3.3 の文言「`.`・`..` を除いた最初の構成要素」は、途中の `..` を捨てたうえで最初の構成要素を見るので、`src/../data/x` の最初は `src` になり通っていた（2026-11-01 の 3e レビューの H1。「プロジェクト直下の `data/`」という意図から外れる）。`..` を解いた形でも①〜③を見る。書いたままの形での判定は残す（解いた形に置き換えない。7節-23）。`..` を解くのは L5 だけで、basename で見る規則（L1〜L4・L6・移植元の `.env` など）と構成要素で見る規則（退避フォルダ・B の `.claude`）は変えない（`..` を解くと構成要素は打ち消されて減るだけで、新しい名前は現れない。どこかの構成要素を見る規則は書いたままの形で既に当たっている。basename が変わるのは末尾が `..` の形だけで、`x/.env/y/..` のようにファイルの下を指す、実在しないパスになる）
 - **L5 の③と `project_dir`**: `check_command(cmd)`（`project_dir=None`）では③が働かない。`main` は `CLAUDE_PROJECT_DIR` を渡すので、本番では常に働く（`TestMainContract.test_project_dir_from_environ_for_customer_data`）
 - 【architect へ】移植元の判定は「秘密パスの判定は `project_dir` を受け取らない」作りなので、L5 ③・L6 は語彙表（定数）を足すだけでは書けない（L1〜L3・V は定数の追加で済む見込み。L4 は glob の判定の追加、L5 は先頭側で見る判定と A3 での扱いの分岐、L6 は `SAFE_ENV_SUFFIXES` とは別の例外）。`tasks/todo.md` 3c の「語彙表（定数）だけに LES の差分を足す」は、この4点については成り立たない。差分をどこに閉じ込めるかは architect が決める（11節「architect に委ねる点」）
 
@@ -696,7 +705,10 @@ cd /work/proj && find . -path ./node_modules -prune -o -path ./frontend/node_mod
 | --- | --- | --- | --- |
 | `test_customer_db_and_excel_then_blocked` | `cat data/clients.db`・`cat clients.db`・`cat /tmp/x/clients.db`・`cat ~/.config/x/clients.db`・`head -c 300 Thumbs.db`・`cat x.sqlite`・`cat x.sqlite3`・`cat x.sqlite-journal`・`cat cf_simulation_20260407.xlsx`・`cat data/output/x.xlsx`・`cp clients.db /tmp/x`・`cp clients.db data/`・`strings data/clients.db`・`xxd clients.db \| head`・`cat X.DB`・`cat Book.XLSX`・`cat X.SQLITE3` | 止 | 正常系 |
 | `test_customer_data_dir_then_blocked`（`project_dir="/work/proj"`） | `cat data/scenarios/a.yaml`・`cat ./data/scenarios/a.yaml`・`cat "$CLAUDE_PROJECT_DIR"/data/scenarios/a.yaml`・`cat ${CLAUDE_PROJECT_DIR}/data/scenarios/a.yaml`・`cat /work/proj/data/scenarios/a.yaml`・`cat ~/pjt/proj/data/scenarios/a.yaml`・`cat ../proj/data/scenarios/a.yaml`・`cat DATA/scenarios/a.yaml`・`grep -r KEY data`・`grep -r KEY data/`・`cp -r data /tmp/bk`・`tar czf /tmp/x.tgz data`・`zip -r /tmp/x.zip data`・`rsync -a data/ /tmp/bk/`・`cd data && cat scenarios/a.yaml`・`cd data/scenarios && ls \| head`・`ls data/ \| while read f; do cat "data/$f"; done` | 止 | 正常系/すり抜け |
-| `test_customer_data_dir_without_project_dir_then_blocked`（`project_dir=None`） | `cat data/scenarios/a.yaml`・`cat "$CLAUDE_PROJECT_DIR"/data/scenarios/a.yaml`・`grep -r KEY data`・`cd data && cat scenarios/a.yaml` | 止 | 境界値 |
+| `test_customer_data_dir_without_project_dir_then_blocked`（`project_dir=None`） | `cat data/scenarios/a.yaml`・`cat "$CLAUDE_PROJECT_DIR"/data/scenarios/a.yaml`・`grep -r KEY data`・`cd data && cat scenarios/a.yaml`・【決定11】`cat src/../data/scenarios/a.yaml`・`cat $CLAUDE_PROJECT_DIR/src/../data/x` | 止 | 境界値 |
+| `test_customer_data_dir_through_dotdot_then_blocked`（決定11。`project_dir="/work/proj"`） | `cat src/../data/scenarios/a.yaml`・`cat $CLAUDE_PROJECT_DIR/src/../data/x`・`cat /work/proj/src/../data/x`（以上3つが 3e レビューの H1）・`cat ./src/../data/x`・`cat src/./../data/x`・`cat src/sub/../../data/x`・`cat src/../../data/x`（解いた形 `../data/x` の先頭に `..` が余る＝プロジェクトの外に出うる。7節-23）・`cat "${CLAUDE_PROJECT_DIR}/src/../data/x"`・`cat ~/pjt/proj/src/../data/x`・`cat SRC/../DATA/x`・`cat src/../data`・`grep -r KEY src/../data`・`cp -r src/../data /tmp/bk`・`cd src/../data && cat scenarios/a.yaml`・`dd if=src/../data/scenarios/a.yaml`・`cat < src/../data/scenarios/a.yaml`（A2）・`python3 -c "print(open('src/../data/scenarios/a.yaml').read())"`（A3。`/` を含む語） | 止 | すり抜け |
+| `test_customer_data_dir_written_form_still_blocked`（決定11。`project_dir="/work/proj"`。書いたままの形での判定を残すことの回帰防止） | `cat data/../src/a.py`（書いたままの最初の構成要素が `data`）・`cat ../data/x`・`cat ../../data/x`・`cat $CLAUDE_PROJECT_DIR/../data/x`・`cat /work/proj/../data/x`・`cat /work/other/../proj/data/x`（`..` でプロジェクトの外に出る形。7節-23） | 止 | 境界値 |
+| `test_dotdot_not_resolving_to_customer_data_then_allowed`（決定11。`project_dir="/work/proj"` と `None` の両方） | `cat data_x/../src/a.py`・`cat tests/../src/data_paths.py`・`cat src/../tests/data/x.json`・`cat src/data/../a.py`・`cat tests/data/../x.json`・`cat frontend/../frontend/src/data/x.ts`・`cat /work/proj/src/../tests/data/x.json`・`cat $CLAUDE_PROJECT_DIR/src/../src/data_paths.py`・`cat /work/other/src/../data/x`・`cat /tmp/x/../data/y` | 通 | 境界値 |
 | `test_other_data_dirs_and_similar_names_then_allowed`（`project_dir="/work/proj"`） | `cat tests/data/x.json`・`cat frontend/src/data/x.ts`・`cat /tmp/x/data/a.yaml`・`cat /work/other/data/a.yaml`・`cat src/data_paths.py`・`cat docs/design/data_directory.md`・`cat metadata/x.txt`・`cat data.json`・`cat scenario.yaml`・`cat src/db/sqlite_repository.py`・`cat tests/db/test_sqlite_repository.py`・`jq .data package.json`・`grep -rn "data =" src/` | 通 | 境界値 |
 | `test_sqlite3_and_unzip_reading_secrets_then_blocked` | `sqlite3 data/clients.db .tables`・`sqlite3 data/clients.db "select * from clients"`・`sqlite3 -readonly ~/.config/x/clients.db .dump`・`echo .tables \| sqlite3 data/clients.db`・`sqlite3 data/clients.db .dump > /tmp/x.sql`・`sqlite3 x.sqlite3 .schema`・`sqlite3 tests/fixtures/deny_probe/dummy.db .tables`（タスク6の実機確認と同じ形）・`sqlite3 :memory: < data/q.sql`（A2）・`unzip -p data/output/x.xlsx xl/sharedStrings.xml`・`unzip -p cf_simulation_20260407.xlsx`・`unzip -o data/output/x.xlsx -d /tmp/x`・`unzip -l cf_simulation_20260407.xlsx`（一覧だけでも止まる＝7節-21）・`unzip -p secrets.zip .env` | 止 | 正常系 |
 | `test_sqlite3_and_unzip_without_secret_then_allowed` | `sqlite3 --version`・`sqlite3 :memory: "select 1"`・`unzip -o release.zip -d build/`・`unzip -l dist.zip` | 通 | 境界値 |
@@ -705,8 +717,9 @@ cd /work/proj && find . -path ./node_modules -prune -o -path ./frontend/node_mod
 | `test_glob_matching_customer_files_then_blocked` | `cat *.db`・`cat *.xlsx`・`cat *.xls?`・`cat clients.d?`・`cat *.*`・`cat *.sqlite*`・`cat */clients.db`・`cat data/*` | 止 | すり抜け |
 | `test_glob_not_matching_customer_files_then_allowed` | `cat *.py`・`cat *.yaml`・`cat tests/*.py`・`head -5 src/*.py` | 通 | 境界値 |
 | `test_env_development_then_allowed`（決定3） | `cat frontend/.env.development`・`cat .env.development`・`cd frontend && cat .env.development`・`grep VITE_ frontend/.env.development`・`diff frontend/.env.development /tmp/x`・`cat FRONTEND/.ENV.DEVELOPMENT` | 通 | 正常系 |
+| `test_env_development_in_backup_dir_still_blocked`（決定10。reviewer が 3e で足した） | `cat ~/claude-settings-backup/.env.development`・`cat ~/claude-settings-backup/frontend/.env.development` | 止 | 境界値 |
 | `test_env_development_variants_still_blocked`（決定3の範囲の外） | `cat frontend/.env.development.local`・`cat .env.development.local`・`cat frontend/.env.development.bak`・`cat frontend/.env.d*`・`cat frontend/.env*`・`cat frontend/.env`・`cat frontend/.env.local`・`cat frontend/.env.production` | 止 | 境界値 |
-| `test_function_and_coproc_bodies_customer_data_then_blocked` | 9.4.1 の関数定義・coproc の並び（4形）× BODY=`sqlite3 data/clients.db .tables` | 止 | すり抜け |
+| `test_function_and_coproc_bodies_customer_data_then_blocked` | 9.4.1 の並び（移植元の7形）× BODY=`sqlite3 data/clients.db .tables` | 止 | すり抜け |
 | `test_blocked_reason_mentions_customer_target` | `sqlite3 data/clients.db .tables`（`project_dir="/work/proj"`） | 理由が `guard: ` で始まり、`秘密ファイルの読み取り` と `data/clients.db` を含む（顧客データでも移植元と同じカテゴリ名＝7節-22） | 正常系 |
 
 ### 10.3 9節（誤検知の修正）との組み合わせ（`TestSecretRead` に足す）
@@ -722,11 +735,13 @@ cd /work/proj && find . -path ./node_modules -prune -o -path ./frontend/node_mod
 
 10.2・10.3 の「通」の行は、移植元の guard に LES の語彙を仮に当てて、2026-10-28 に tester が `check_command(…, "/work/proj")` で確かめた（L4 の `clients.d?`・L5 ③の `../proj/data/…` は仮の当て方が仕様と違ったので、仕様の側を正とする）。
 
+2026-11-01（決定11）に、3e 時点の LES の guard（決定11の前）へ `check_command(…, "/work/proj")` と `check_command(…)` で当てて確かめた: `test_customer_data_dir_through_dotdot_then_blocked` の行はすべて**通ってしまう**（Red になる）。`test_customer_data_dir_written_form_still_blocked` の行は `project_dir="/work/proj"` ですべて止まる（回帰防止）。`test_dotdot_not_resolving_to_customer_data_then_allowed` の行は両方の `project_dir` ですべて通る。
+
 ---
 
-## 11. 【LES】運営者の決定（2026-10-29）
+## 11. 【LES】運営者の決定（2026-10-29・2026-11-01）
 
-tester が出した9点に、運営者がすべて推奨どおりに答えた。本文・テスト一覧は決定に合わせて確定させた。
+1〜9: tester が出した9点に、運営者がすべて推奨どおりに答えた（2026-10-29）。10: 2026-10-30 追加。11・12: 3e（reviewer）のレビューの後に運営者が決めた（2026-11-01）。本文・テスト一覧は決定に合わせて確定させた。
 
 1. **`data` だけの語（`/` 無し）は、A1・A2 では数え、A3（インラインコード）では数えない**（3.3・7節-19・10.1 L5）。どこでも数えると AI がよく書く一行の Python（変数名 `data`）を止め、guard を避ける回り道を招く。どこでも数えないと `grep -r KEY data` で顧客データがそのまま会話に出る。テスト: 10.2 `test_customer_data_dir_then_blocked`・`test_interpreter_inline_code_data_identifier_then_allowed`
 2. **`.env.development` の例外は、basename がちょうど `.env.development` のときだけ。階層は問わない**（3.3・7節-17・10.1 L6）。deny も階層を問わず読める形。`frontend/` に限ると `cd frontend && cat .env.development` が止まり、guard は cd 先でパスをつながないので直せない。テスト: 10.2 `test_env_development_then_allowed`・`test_env_development_variants_still_blocked`
@@ -737,11 +752,14 @@ tester が出した9点に、運営者がすべて推奨どおりに答えた。
 7. **SQLite の付随ファイル（`clients.db-wal`・`-shm`・`-journal`）・拡張子の無い DB は記録だけ**（8節）。`data/` の下なら置き場所の規則で止まる。Electron の保存先の付随ファイルも止めるときは、**deny と guard を同時に足す**（片方だけ足すと 3d の `test_every_read_deny_is_covered` がずれる）
 8. **展開先として保護パスに書き込む形（`unzip -d .claude/hooks`・`tar -C .claude/hooks`）は記録だけ**（8節）。今回の差分の外。移植元にも同じ穴があり、移植元の記録は移植元の側で行う。直すなら移植元と同時に
 9. **9.2.1 の実際の形が grep のパターン `\.sqlite` で止まるのは受け入れる**（9.2.1・8節）。パターンを `[.]sqlite` と書けば通る。grep のパターンの区別は移植元で「読み違えると新しい穴になる」として先送りした変更で、LES だけで先に入れると移植元との差分が大きくなる。元の形はテストで固定しない
-10. **退避フォルダの中の `.env.development`（`~/claude-settings-backup/.env.development`）は止める**（2026-10-30 追加。3.3 の退避フォルダの行と L6 の例外の両方に当たる。L6 は basename の規則だけを外し、退避フォルダの規則は残す。設計 `docs/design/guard_hook.md`）
+10. **退避フォルダの中の `.env.development`（`~/claude-settings-backup/.env.development`）は止める**（2026-10-30 追加。3.3 の退避フォルダの行と L6 の例外の両方に当たる。L6 は basename の規則だけを外し、退避フォルダの規則は残す。設計 `docs/design/guard_hook.md`）。テスト: 10.2 `test_env_development_in_backup_dir_still_blocked`（3e で reviewer が足した）
+11. **途中に `..` を挟んだ `data/` を止める**（2026-11-01。3e レビューの H1）。`cat src/../data/scenarios/a.yaml`・`cat $CLAUDE_PROJECT_DIR/src/../data/x`・`cat /work/proj/src/../data/x` が、3.3 ①の「`.`・`..` を除いた最初の構成要素」の文言どおりに通っていた。文言どおりではあるが「プロジェクト直下の `data/`」という意図から外れる。L5 の①〜③を、書いたままの形と `..` を解いた形の両方に掛け、どちらかに当たれば止める（止める側にだけ倒す）。`..` でプロジェクトの外に出る形（`cat ../data/x`・`cat src/../../data/x`・`cat $CLAUDE_PROJECT_DIR/../data/x`・`cat /work/proj/../data/x`）も止める（7節-23）。規則: 3.2・3.3・10.1 L5。テスト: 10.2 `test_customer_data_dir_through_dotdot_then_blocked`・`test_customer_data_dir_written_form_still_blocked`・`test_dotdot_not_resolving_to_customer_data_then_allowed`、`test_customer_data_dir_without_project_dir_then_blocked` に2行
+12. **3e レビューの H2・H3・H4 と、ヒアドキュメントで渡す Python は記録だけ**（2026-11-01。8節の【LES】）。H2（SQL 文字列の中の DB）・H3（ブレース展開）は、移植元にも同じ種類の穴があり（awk のプログラム・`cat .{env,x}`）、LES だけで先に直すと移植元との差分が大きくなる。H3 は移植元で直すときに LES の語彙の分も一緒に直す。H4（`$PWD`・`${…:-…}`）は前置部分の表に足す変更で、移植元の 3.2 の扱いと合わせて決める。ヒアドキュメントは移植元 7節-6 で受け入れた穴で、LES では漏れるものが顧客データに広がることを記録する。テストで「通る」ことを固定しない
 
 ### architect に委ねる点
 - L4・L5・L6 の判定を guard.py のどこに置くか（10.1 の【architect へ】）。移植元との差分を「定数のブロック＋最小限の判定」に閉じ込め、移植元への追従をしやすくする形（`tasks/todo.md`「guard の持ち込み方」案A の弱点＝二重管理への手当て）
 - L5 ③のために、秘密パスの判定へ `project_dir` をどう渡すか（関数の引数を増やすか、呼び出し側で判定するか）。`check_command` の公開面（1節）は変えない
 - A3 でだけ `data` だけの語を数えない分岐の置き場所
+- 【決定11】`..` を解いた形の作り方と置き場所（L5 の判定の中で2つの形を作って①〜③に掛けるか、正規化を別の関数に分けるか）。`posixpath.normpath` をそのまま使うと `~/../data/x` が `data/x` になり前置部分を越えて戻るので、前置部分を残す手当てが要る（3.3。この形はテストで固定しないので、手当ての有無は設計で決めてよい）。書いたままの形での判定（今の `path_components`）を置き換えないこと（7節-23）
 - テストの読み込みを `tests/hooks/conftest.py` にそろえるか（2節）、ヘルパーをどこに置くか（5節）
 - 移植元のテストを複製したうえで、本書の【LES】の行をどう当てるか（パラメータの置き換え・移動・足すメソッドの置き場所）

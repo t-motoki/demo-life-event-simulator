@@ -10,6 +10,8 @@ build/
 
 # 環境変数
 .env
+# guard・deny の実機確認用のダミー。中身は DUMMY=1
+!tests/fixtures/deny_probe/.env
 .env.local
 
 # OS

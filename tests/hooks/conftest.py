@@ -26,7 +26,8 @@ def hook_script(name: str) -> Path:
     return path
 
 
-def _load(name: str) -> ModuleType:
+def load_hook(name: str) -> ModuleType:
+    """フックのスクリプトをモジュールとして読み込む（fixture を受け取れないヘルパーからも呼べるよう公開する）"""
     spec = importlib.util.spec_from_file_location(f"hooks_{name}", hook_script(name))
     module = importlib.util.module_from_spec(spec)
     # sys.modules に登録しない: テスト間で monkeypatch した状態を他のモジュールから見せないため
@@ -36,12 +37,12 @@ def _load(name: str) -> ModuleType:
 
 @pytest.fixture(scope="module")
 def post_hook() -> ModuleType:
-    return _load("post_tool_run_tests")
+    return load_hook("post_tool_run_tests")
 
 
 @pytest.fixture(scope="module")
 def fp_hook() -> ModuleType:
-    return _load("pre_tool_fp_warning")
+    return load_hook("pre_tool_fp_warning")
 
 
 @pytest.fixture
