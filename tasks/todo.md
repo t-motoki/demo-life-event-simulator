@@ -169,11 +169,17 @@ Claude Code が LES で動くとき、次の3つが仕組みで止まる状態�
   - テスト: `tests/hooks/test_post_tool_run_tests.py`・`tests/hooks/test_pre_tool_fp_warning.py`（標準入力の JSON を与えて出力と終了コードを見る。pytest の実行そのものは差し替えて確かめる）
 - [ ] 3. **TDD 対象**: guard フックを持ち込む（tester → architect → engineer → reviewer）
   - 3a. tester: 移植元の仕様を LES 用に写し、`docs/design/test_spec_guard_hook.md` を作る。差分は「LES で足す秘密」（`data/` 配下・`*.db`・`*.sqlite*`・`*.xlsx`・`settings.local.json`。`frontend/.env.development` は例外）と「読む動詞に `sqlite3`・`unzip` を足す」の2点だけにする。テスト中のパス例はこのリポジトリ名・`$CLAUDE_PROJECT_DIR` に置き換える。設計書・テストに移植元のリポジトリ名は書かない（決定8。「移植元のコミット」とだけ書く）
+    - 2026-10-29 完了: `docs/design/test_spec_guard_hook.md`（移植元コミット `d20ea9a` の誤検知の修正まで含めて写した。LES の差分は10節、運営者の決定9点は11節）
   - 3b. architect: `docs/design/guard_hook.md`（移植元の設計を参照し、差分と移植元コミットだけ書く）
-  - 3c. engineer: `.claude/hooks/guard.py` を移植元から複製し、語彙表（定数）だけに LES の差分を足す。`tests/hooks/__init__.py`・`tests/hooks/test_guard.py`・`tests/fixtures/deny_probe/.env`（中身 `DUMMY=1`。`.gitignore` の `.env` に掛かるので除外行を足す）を作る。Red → Green
-  - 3d. `TestRepositoryIntegration` の `DENY_SAMPLES` を 1 の deny と一致させる（deny を足したらテストの表も足す）
-  - 3e. reviewer（四層レビュー）
-- [ ] 4. **配線（設定。テストは 2・3 に含む）**: `hooks.PreToolUse` に matcher `Bash` の guard、2 の2フックを差し替え。Edit ツールで行い承認で確認する。配線後は Bash で `.claude/` を書き換えられなくなる（以後の修正は Edit ツール）
+    - 2026-10-29 完了: 移植元の関数・定数は変えず、LES の判定は【LES】ブロック1か所と `# 【LES】` の印を付けた接続点7行に閉じる（L4〜L6 は判定を足すので、定数だけでは済まない）
+  - 3c. engineer（設計 `docs/design/guard_hook.md`）。`.claude/` には Write・Edit ツールだけで書く（承認あり）。Bash の cp・リダイレクト・patch や、/tmp の試作を写す手順は取らない
+    - 3c-1 Red: `tests/hooks/conftest.py` の `_load` を `load_hook` に改名し、`tests/hooks/test_guard.py` を作る（移植元のテストを写し、仕様の【LES】の行を `# 【LES】` の印とクラス末尾の囲みで当てる）。`tests/fixtures/deny_probe/.env`（`DUMMY=1`・Write）と `.gitignore` の除外行も作る。guard のテストがテストごとに落ちることを確かめる
+    - 3c-2: `.claude/hooks/guard.py` を移植元のコミット `d20ea9a` と一字一句同じに書き（Write）、`cmp` で一致を確かめる。【LES】のテストだけが落ちることを確かめる
+    - 3c-3 Green: Edit ツールで【LES】ブロック・接続点7行・docstring を当てる
+    - 3c-4: 性能テスト2件に `slow` を付け、`pytest.ini` の説明・README の1文（ファイル名に顧客の名前を使わない）・`docs/rules/00_workflow.md` の構成図（`tests/fixtures/`）を直す
+  - 3d. `DENY_SAMPLES` を deny の16件にし、`test_every_read_deny_is_covered` に `project_dir` を渡す。`test_deny_exception_is_also_allowed_by_guard` を足す。`test_settings_wires_guard` は持ち込まない（タスク4）
+  - 3e. reviewer（四層レビュー）。あわせて、移植元の `d20ea9a` と `diff` を取り差分が【LES】の印と【LES】ブロックに閉じていること（テストも同じ）、公開リポジトリに出せない語の grep が0件であることを確かめる
+- [ ] 4. **配線（設定。テストは 2・3 に含む）**: `hooks.PreToolUse` に matcher `Bash` の guard（`"timeout": 10` 付き）、2 の2フックを差し替え。`test_settings_wires_guard` と G1〜G4 もこの工程で書く。Edit ツールで行い承認で確認する。配線後は Bash で `.claude/` を書き換えられなくなる（以後の修正は Edit ツール）
 - [ ] 5. **設定のみ（運営者の作業が要る）**: `.claude/settings.local.json` の広い許可を削る。AI は中身を開かない。運営者に中身（秘密があれば伏せて）を見せてもらうか、運営者自身が `Bash(*)`・`Bash(python:*)`・`Bash(cat:*)`・`Read(//**)` のような広い許可を消す。秘密（トークン等）が入っていたら値の失効・再発行も検討
 - [ ] 6. **実機確認（Claude Code を再起動してから・人の立ち会いのもと・本物ではなくダミーで）**
   - `cat tests/fixtures/deny_probe/.env` → guard が止める（`PreToolUse:Bash hook error`・`DUMMY` が出ない）
@@ -247,6 +253,7 @@ Claude Code が LES で動くとき、次の3つが仕組みで止まる状態�
 
 ### バックログ（今回はやらない）
 
+- guard は `rm -rf data`・`rm data/clients.db` など顧客データの削除を止めない（`.gitignore` 済みで取り戻せない。`git clean -fdx` は止まる）。止めるか・片付け（`rm data/output/x.xlsx`）も止めるかを決める（`docs/design/test_spec_guard_hook.md` 11節 決定5）
 - `docs/diagrams/system.mmd` の excel_writer のノードが「2シート構成」のまま（今は3シート）
 - `docs/guides/setup-windows.md` の `python src/main.py`（`-m` も引数も無い）は今の実装で動かない。手順を直す。同じ手引きの「4.」は `pip install openpyxl` だけで、CLI に要る PyYAML が入らない（`pip install -r requirements.txt` にするか、要るものだけにするかを決める）。`mkdir -p data/scenarios` に当たる Windows の手順（`mkdir data\scenarios`）も無い
 - README の「ステータス」（要件定義完了 / 実装前）・「使い方」（実装後に追記）が今の実装と合っていない。「データの置き場所」の節と重ならないように書き直す（タスク0.5 の reviewer・2026-10-20）
