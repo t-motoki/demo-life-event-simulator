@@ -344,4 +344,23 @@ LES のテストを別ファイル（`test_guard_les.py`）にする案は採ら
 
 ## 実機確認の結果
 
-（タスク6で書く）
+2026-11-03（タスク6）。Claude Code 2.1.316 を再起動した後のセッションで、運営者の立ち会いのもとダミーで確かめた。書き換え・`rm -rf`・`git push -f` は試していない（単体テストで担保）。
+
+| # | 操作 | 期待 | 結果 |
+|---|------|------|------|
+| 1 | Bash `cat tests/fixtures/deny_probe/.env` | guard が止める | ○ `PreToolUse:Bash hook error`・`guard: 秘密ファイルの読み取りのため止めました`。`DUMMY` は出ない |
+| 2 | Bash `sqlite3 tests/fixtures/deny_probe/dummy.db .tables` | 止まる | ○ 同じメッセージで止まった |
+| 3 | Bash `cat tests/fixtures/deny_probe/cf_simulation_dummy.xlsx` | 止まる | ○ 同じメッセージで止まった |
+| 4 | Read ツール `tests/fixtures/deny_probe/.env` | deny で拒否 | ○ `File is in a directory that is denied by your permission settings.` |
+| 5 | `head -3 .claude/settings.json`・`git status --short`・`.venv/bin/python -m pytest tests/hooks/ -q` | 通る | ○ 3つとも通った（tests/hooks 1233 passed・2 xfailed） |
+| 6 | Edit ツールで `src/data_paths.py` に1行足して戻す | pytest フックが走る | ○ 編集のたびに `pytest: テストは成功した`（1436 passed・10 deselected・2 xfailed。`-m "not slow"` が効いている） |
+| 7 | Edit ツールで `src/domain/education.py` に1行足して戻す | 要件書に `TODO: FPに確認` があれば警告 | ○ 警告は出なかった。要件書の `TODO: FPに確認` が0件なので仕様どおり。警告が出る側は単体テストで担保（実機では要件書を書き換えてまで試さない） |
+
+### 実機で見つかった誤検知（仕様どおり・記録だけ）
+
+セッション開始時の状況確認で、`grep … ; sed -n 175,220p docs/spec/01_requirements.md; ls tasks; ls *.db *.xlsx 2>/dev/null | head` が止まった（`guard: 秘密ファイルの読み取りのため止めました: *.db`）。guard に標準入力で渡して切り分けた結果:
+
+- `ls *.db`・`ls *.db | head`・`ls *.db *.xlsx 2>/dev/null | head` は単独なら通る（`ls` は読む動詞ではない）
+- `sed -n 1,5p docs/spec/01_requirements.md; ls *.db` は止まる
+
+原因は仕様 A1・設計判断2の「読む動詞と秘密パスが**コマンド全体のどこかに同居**していれば止める」（`F=.env; cat $F` を拾うための近似）。仕様が受け入れている誤検知なので直さない。回避策: 秘密の名前を含む `ls` は、読む動詞を含むコマンドとは別の Bash 呼び出しにする。
