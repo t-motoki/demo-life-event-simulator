@@ -355,6 +355,7 @@ LES のテストを別ファイル（`test_guard_les.py`）にする案は採ら
 | 5 | `head -3 .claude/settings.json`・`git status --short`・`.venv/bin/python -m pytest tests/hooks/ -q` | 通る | ○ 3つとも通った（tests/hooks 1233 passed・2 xfailed） |
 | 6 | Edit ツールで `src/data_paths.py` に1行足して戻す | pytest フックが走る | ○ 編集のたびに `pytest: テストは成功した`（1436 passed・10 deselected・2 xfailed。`-m "not slow"` が効いている） |
 | 7 | Edit ツールで `src/domain/education.py` に1行足して戻す | 要件書に `TODO: FPに確認` があれば警告 | ○ 警告は出なかった。要件書の `TODO: FPに確認` が0件なので仕様どおり。警告が出る側は単体テストで担保（実機では要件書を書き換えてまで試さない） |
+| 8 | Edit ツールで `.claude/settings.json` を書き換えようとする（空白1つの無害な変更） | ask で承認ダイアログが出る | ○ ダイアログが出て、運営者が拒否し、書き込まれなかった。3c（2026-11-01）・タスク4 で出なかった件は、再起動後のこのセッションでは再現しなかった（当時出なかった原因は特定していない）。`Edit(./.claude/hooks/**)` は試していない（同じ ask の仕組み） |
 
 ### 実機で見つかった誤検知（仕様どおり・記録だけ）
 
