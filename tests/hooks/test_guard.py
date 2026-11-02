@@ -30,6 +30,7 @@ from tests.hooks.conftest import hook_script, load_hook  # 【LES】
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SETTINGS_PATH = REPO_ROOT / ".claude" / "settings.json"
+EXPECTED_COMMAND = 'python3 "$CLAUDE_PROJECT_DIR"/.claude/hooks/guard.py'
 PROBE_ENV = "tests/fixtures/deny_probe/.env"
 
 CATEGORY_SECRET = "秘密ファイルの読み取り"
@@ -37,7 +38,7 @@ CATEGORY_PROTECTED = "保護対象の書き換え"
 CATEGORY_IRREVERSIBLE = "取り返しのつかない操作"
 
 
-# 【LES】HOOK_PATH・EXPECTED_COMMAND・_load_hook・hook は持ち込まない（読み込みは conftest の load_hook。下の _hook）
+# 【LES】HOOK_PATH・_load_hook・hook は持ち込まない（読み込みは conftest の load_hook。下の _hook）
 
 
 # ---------------------------------------------------------------------------
@@ -1756,7 +1757,19 @@ class TestRepositoryIntegration:
             result = _hook().check_command(f"cat {sample}", str(REPO_ROOT))  # 【LES】本番の main と同じく project_dir を渡す
             assert result, f"{rule} の代表例 {sample!r} を guard が止めません"
 
-    # 【LES】test_settings_wires_guard はタスク4（配線）で書く
+    def test_settings_wires_guard(self):
+        settings = json.loads(SETTINGS_PATH.read_text(encoding="utf-8"))
+        groups = settings["hooks"]["PreToolUse"]
+        bash_hooks = [h for g in groups if g.get("matcher") == "Bash" for h in g["hooks"]]
+        # 辞書の完全一致にしない: 将来 statusMessage などが足されても配線の意味は変わらないため
+        guard_hooks = [h for h in bash_hooks if h.get("type") == "command" and h.get("command") == EXPECTED_COMMAND]
+        assert guard_hooks, "PreToolUse の matcher Bash に guard.py が配線されていません"
+        # 判定は文字列処理だけで速い。長すぎる待ちは止まったときに作業を固めるので 10 秒に揃える
+        assert all(h.get("timeout") == 10 for h in guard_hooks)
+        # guard の追加で既存の Edit|Write のフック（FP 未確認の警告）を消していないこと  # 【LES】
+        edit_write = [g for g in groups if g.get("matcher") == "Edit|Write"]
+        assert edit_write, "既存の Edit|Write グループが消えています"
+        assert any("pre_tool_fp_warning.py" in h["command"] for g in edit_write for h in g["hooks"])  # 【LES】
 
     # --- 【LES】ここから（仕様 4節）---
 
@@ -1765,5 +1778,62 @@ class TestRepositoryIntegration:
         settings = json.loads(SETTINGS_PATH.read_text(encoding="utf-8"))
         assert "Read(**/.env.development*)" not in settings["permissions"]["deny"]
         assert _hook().check_command("cat frontend/.env.development") is None
+
+    # --- 【LES】ここまで ---
+
+    # --- 【LES】ここから（編集フックの配線。docs/design/test_spec_edit_hooks.md の G1〜G4）---
+    # 仕様が「deny とテストの表を一致させるテストとまとめて書く」と決めているので、
+    # settings.json を読むテストはこのクラスに集める（フックごとのファイルに散らさない）
+
+    RUN_TESTS_COMMAND = 'python3 "$CLAUDE_PROJECT_DIR"/.claude/hooks/post_tool_run_tests.py'
+    FP_WARNING_COMMAND = 'python3 "$CLAUDE_PROJECT_DIR"/.claude/hooks/pre_tool_fp_warning.py'
+
+    @staticmethod
+    def _command_hooks(event, matcher, command):
+        """settings の hooks.<event> のうち、matcher が一致するグループで command が一致する hook の一覧"""
+        settings = json.loads(SETTINGS_PATH.read_text(encoding="utf-8"))
+        groups = settings["hooks"].get(event, [])
+        return [
+            h
+            for g in groups
+            if g.get("matcher") == matcher
+            for h in g["hooks"]
+            # 辞書の完全一致にしない（test_settings_wires_guard と同じ理由）
+            if h.get("type") == "command" and h.get("command") == command
+        ]
+
+    def test_settings_wires_run_tests_hook(self):
+        # G1
+        command = self.RUN_TESTS_COMMAND
+        assert self._command_hooks("PostToolUse", "Edit|Write", command), (
+            "PostToolUse の matcher Edit|Write に post_tool_run_tests.py が配線されていません"
+        )
+
+    def test_settings_wires_fp_warning_hook(self):
+        # G2
+        command = self.FP_WARNING_COMMAND
+        assert self._command_hooks("PreToolUse", "Edit|Write", command), (
+            "PreToolUse の matcher Edit|Write に pre_tool_fp_warning.py が配線されていません"
+        )
+
+    def test_settings_hooks_have_no_absolute_path_or_unset_env(self):
+        # G3: 絶対パスは別の場所に clone すると動かない。CLAUDE_TOOL_INPUT_FILE_PATH は Claude Code が渡さない
+        settings = json.loads(SETTINGS_PATH.read_text(encoding="utf-8"))
+        hooks_text = json.dumps(settings["hooks"], ensure_ascii=False)
+        assert "/home/" not in hooks_text, "hooks に絶対パス /home/… が残っています"
+        assert "CLAUDE_TOOL_INPUT_FILE_PATH" not in hooks_text, "hooks に渡されない環境変数 CLAUDE_TOOL_INPUT_FILE_PATH が残っています"
+
+    def test_settings_run_tests_hook_timeout_outlasts_script(self):
+        # G4: スクリプト側の時間制限が先に切れ、理由（C11）を返せるようにする
+        command = self.RUN_TESTS_COMMAND
+        run_tests_hooks = self._command_hooks("PostToolUse", "Edit|Write", command)
+        assert run_tests_hooks, "PostToolUse の matcher Edit|Write に post_tool_run_tests.py が配線されていません"
+        script_timeout = load_hook("post_tool_run_tests").TIMEOUT_SECONDS
+        for h in run_tests_hooks:
+            assert isinstance(h.get("timeout"), (int, float)), "テスト実行フックに timeout が設定されていません"
+            assert h["timeout"] > script_timeout, (
+                f"テスト実行フックの timeout（{h['timeout']}）がスクリプトの時間制限（{script_timeout}）以下です"
+            )
+            assert h["timeout"] == 180  # 運営者の決定3（docs/design/test_spec_edit_hooks.md）
 
     # --- 【LES】ここまで ---
